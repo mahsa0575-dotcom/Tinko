@@ -4,7 +4,7 @@
 -- Multi-tenant: tenant_id scopes tenant-owned entities.
 -- ============================================================
 
-CREATE TABLE schema_migrations (
+CREATE TABLE IF NOT EXISTS schema_migrations (
   id          text PRIMARY KEY,
   applied_at  timestamptz NOT NULL DEFAULT now()
 );
