@@ -40,16 +40,17 @@ const BUILTIN_TEMPLATES = {
 export async function registerDebugRoutes(fastify, { ctx }) {
   const { repos, pool, router } = ctx;
   const guard = (perm) => ({ onRequest: [fastify.authenticate, fastify.requirePermission(perm)] });
+  const tenantId = (req) => req.admin.tenantId;
 
   // ---------- Config resolution debugger (spec §118, §255) ----------
   fastify.get('/groups/:id/debug', guard('groups.read'), async (req) => {
     const group = (await pool.query(
-      `SELECT * FROM telegram_groups WHERE tenant_id = 1 AND id = $1`, [req.params.id])).rows[0];
+      `SELECT * FROM telegram_groups WHERE tenant_id = $1 AND id = $2`, [tenantId(req), req.params.id])).rows[0];
     if (!group) throw Errors.notFound('Group');
     const settings = await repos.telegram.getGroupSettings(group.id);
-    const defaultPersonality = await repos.aiConfig.getDefaultPersonality(1);
+    const defaultPersonality = await repos.aiConfig.getDefaultPersonality(tenantId(req));
     const personality = settings.personality_id
-      ? await repos.aiConfig.getPersonality(1, settings.personality_id) : null;
+      ? await repos.aiConfig.getPersonality(tenantId(req), settings.personality_id) : null;
 
     return {
       group: { id: group.id, title: group.title, status: group.status, health: group.health },
@@ -72,7 +73,7 @@ export async function registerDebugRoutes(fastify, { ctx }) {
   // ---------- Routing debugger (spec §119) ----------
   fastify.post('/debug/route', guard('models.read'), async (req) => {
     const { profileKey, require = [] } = req.body ?? {};
-    const candidates = await router.candidates({ tenantId: 1, profileKey, require });
+    const candidates = await router.candidates({ tenantId: tenantId(req), profileKey, require });
     const breakers = Object.fromEntries(router.breakerSnapshot().map((b) => [b.providerId, b.state]));
     return {
       profileKey: profileKey ?? '(auto)',
@@ -91,9 +92,9 @@ export async function registerDebugRoutes(fastify, { ctx }) {
   // ---------- Prompt debugger (spec §257) ----------
   fastify.post('/debug/prompt', guard('personalities.read'), async (req) => {
     const { personalityId, groupId, sampleText = 'سلام، تو کی هستی؟' } = req.body ?? {};
-    const personality = personalityId ? await repos.aiConfig.getPersonality(1, personalityId) : null;
+    const personality = personalityId ? await repos.aiConfig.getPersonality(tenantId(req), personalityId) : null;
     const group = groupId ? (await pool.query(
-      `SELECT * FROM telegram_groups WHERE tenant_id = 1 AND id = $1`, [groupId])).rows[0] : null;
+      `SELECT * FROM telegram_groups WHERE tenant_id = $1 AND id = $2`, [tenantId(req), groupId])).rows[0] : null;
     const identity = personality
       ? `هویت و شخصیت تو بر اساس پیکربندی زیر است:\n${personality.system_prompt}`
       : 'تو یک دستیار هوش مصنوعی فارسی‌زبان و دوستانه هستی.';
@@ -117,7 +118,7 @@ export async function registerDebugRoutes(fastify, { ctx }) {
     const { text, groupId = null, userId = null } = req.body ?? {};
     if (!text) throw Errors.validation([{ message: 'text required' }]);
     const queryEmbedding = await router.embed(text).catch(() => null);
-    const results = await repos.memory.searchRanked(1, {
+    const results = await repos.memory.searchRanked(tenantId(req), {
       groupId, userId, queryEmbedding, limit: 10,
     });
     return {
@@ -136,18 +137,18 @@ export async function registerDebugRoutes(fastify, { ctx }) {
     if (!ids.length || !action) throw Errors.validation([{ message: 'ids and action required' }]);
     let affected = 0;
     for (const id of ids) {
-      const group = (await pool.query(`SELECT id, telegram_id FROM telegram_groups WHERE tenant_id = 1 AND id = $1`, [id])).rows[0];
+      const group = (await pool.query(`SELECT id, telegram_id FROM telegram_groups WHERE tenant_id = $1 AND id = $2`, [tenantId(req), id])).rows[0];
       if (!group) continue;
       if (action === 'set_personality') await repos.telegram.updateGroupSettings(group.id, { personality_id: value });
       else if (action === 'set_model_profile') await repos.telegram.updateGroupSettings(group.id, { model_profile_key: value });
       else if (action === 'disable_ai') await repos.telegram.updateGroupSettings(group.id, { ai_enabled: false });
       else if (action === 'enable_ai') await repos.telegram.updateGroupSettings(group.id, { ai_enabled: true });
-      else if (action === 'blacklist') await repos.blacklist.add(1, { kind: 'group', telegramId: group.telegram_id, reason: 'bulk blacklist' });
+      else if (action === 'blacklist') await repos.blacklist.add(tenantId(req), { kind: 'group', telegramId: group.telegram_id, reason: 'bulk blacklist' });
       else if (action === 'set_moderation') await repos.telegram.updateGroupSettings(group.id, { moderation_policy: value });
       else throw Errors.validation([{ message: `unknown action ${action}` }]);
       affected += 1;
     }
-    await repos.ops.audit({ tenantId: 1, actorId: req.admin.id, action: `groups.bulk_${action}`, after: { ids, value }, requestId: req.id, ip: req.ip });
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: `groups.bulk_${action}`, after: { ids, value }, requestId: req.id, ip: req.ip });
     return { affected };
   });
 
@@ -167,10 +168,10 @@ export async function registerDebugRoutes(fastify, { ctx }) {
     if (!template) throw Errors.notFound('Template');
     if (preview) return { preview: template.settings };
     const group = (await pool.query(
-      `SELECT id FROM telegram_groups WHERE tenant_id = 1 AND id = $1`, [req.params.id])).rows[0];
+      `SELECT id FROM telegram_groups WHERE tenant_id = $1 AND id = $2`, [tenantId(req), req.params.id])).rows[0];
     if (!group) throw Errors.notFound('Group');
     await repos.telegram.updateGroupSettings(group.id, template.settings);
-    await repos.ops.audit({ tenantId: 1, actorId: req.admin.id, action: 'group.template_applied', entityType: 'group', entityId: group.id, after: { key }, requestId: req.id });
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'group.template_applied', entityType: 'group', entityId: group.id, after: { key }, requestId: req.id });
     return { applied: true, settings: template.settings };
   });
 
@@ -196,7 +197,7 @@ export async function registerDebugRoutes(fastify, { ctx }) {
       bio: String(req.body?.bio ?? '').slice(0, 500),
     };
     await repos.ops.setSetting('bot_identity', identity, req.admin.id);
-    await repos.ops.audit({ tenantId: 1, actorId: req.admin.id, action: 'settings.bot_identity', after: { name }, requestId: req.id });
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'settings.bot_identity', after: { name }, requestId: req.id });
     return identity;
   });
 
@@ -235,13 +236,13 @@ export async function registerDebugRoutes(fastify, { ctx }) {
     await repos.ops.setSetting('telegram_token',
       { token_enc: encryptSecret(token, ctx.config.ENCRYPTION_KEY), username: res.result.username },
       req.admin.id);
-    await repos.ops.audit({ tenantId: 1, actorId: req.admin.id, action: 'settings.bot_token_set', after: { username: res.result.username }, requestId: req.id });
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'settings.bot_token_set', after: { username: res.result.username }, requestId: req.id });
     return { ok: true, username: res.result.username, note: 'بات حداکثر تا ۱۵ ثانیه دیگر با توکن جدید بالا می‌آید' };
   });
 
   fastify.delete('/settings/bot-token', guard('settings.write'), async (req) => {
     await pool.query(`DELETE FROM system_settings WHERE key = 'telegram_token'`);
-    await repos.ops.audit({ tenantId: 1, actorId: req.admin.id, action: 'settings.bot_token_removed', requestId: req.id });
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'settings.bot_token_removed', requestId: req.id });
     return { ok: true, note: 'بات خاموش می‌شود مگر اینکه توکن در .env باشد' };
   });
 
@@ -251,7 +252,7 @@ export async function registerDebugRoutes(fastify, { ctx }) {
 
   fastify.put('/settings/resource-thresholds', guard('settings.write'), async (req) => {
     await repos.ops.setSetting('resource_thresholds', req.body ?? DEFAULT_THRESHOLDS, req.admin.id);
-    await repos.ops.audit({ tenantId: 1, actorId: req.admin.id, action: 'settings.thresholds_updated', requestId: req.id });
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'settings.thresholds_updated', requestId: req.id });
     return { ok: true };
   });
 

@@ -61,7 +61,6 @@ export class AIProviderAdapter {
    */
   async requestJson({ url, headers, body, signal }) {
     let attempt = 0;
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       attempt += 1;
       const timeout = AbortSignal.timeout(this.timeoutMs);

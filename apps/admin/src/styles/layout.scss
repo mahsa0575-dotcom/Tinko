@@ -77,6 +77,25 @@
 }
 
 .content { flex: 1; overflow-y: auto; }
+.language-toggle { min-width: 48px; }
+
+@media (max-width: 760px) {
+  .app-shell { display: block; min-height: 100%; padding-bottom: 68px; }
+  .sidebar { position: fixed; inset: auto 0 0; z-index: 40; width: 100%; height: 68px; display: flex; align-items: stretch; padding: 7px 8px; overflow-x: auto; border-inline-end: 0; border-top: 1px solid var(--border); background: var(--glass); backdrop-filter: blur(16px); }
+  .brand, .nav-section, .sidebar-foot { display: none; }
+  .sidebar > div { display: contents; }
+  .nav-item { flex: 0 0 auto; padding: 9px 10px; font-size: 10px; gap: 5px; border-radius: 10px; }
+  .nav-item .icon { margin: 0; }
+  .topbar { padding: 10px 16px; }
+  .search-trigger { min-width: 0; flex: 1; }
+  .page { padding: 20px 16px 28px; }
+  .page-title { font-size: 19px; }
+  .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .metric { padding: 13px; }
+  .metric .metric-value { font-size: 21px; }
+  .toasts { inset-inline: 14px; bottom: 82px; }
+  .toast { min-width: 0; }
+}
 
 // Command palette
 .cmdk-backdrop { position: fixed; inset: 0; background: rgba(3, 6, 14, .6); backdrop-filter: blur(5px); z-index: 70;

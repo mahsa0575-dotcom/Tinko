@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderTemplate, extractPath, extractResponse } from '../src/custom-http.js';
 import { normalizePersian, createProfanityEngine } from '../../../apps/bot/src/moderation/persian.js';
-import { splitForTelegram, escapeHtml } from '../../../apps/bot/src/pipeline.js';
-import { createPipeline } from '../../../apps/bot/src/pipeline.js';
+import { splitForTelegram, escapeHtml, createPipeline } from '../../../apps/bot/src/pipeline.js';
 
 describe('custom provider template engine', () => {
   it('substitutes scalar variables with JSON escaping', () => {

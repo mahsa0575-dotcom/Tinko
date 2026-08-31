@@ -6,6 +6,7 @@ const StoreContext = createContext(null);
 
 export function StoreProvider({ children }) {
   const [theme, setThemeState] = useState(localStorage.getItem('botai_theme') || 'dark');
+  const [lang, setLangState] = useState(localStorage.getItem('botai_lang') || 'fa');
   const [me, setMe] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [toasts, setToasts] = useState([]);
@@ -16,12 +17,11 @@ export function StoreProvider({ children }) {
     localStorage.setItem('botai_theme', theme);
   }, [theme]);
 
-  // direction mirrors selected language
+  // Direction mirrors selected language and can be changed from the panel.
   useEffect(() => {
-    const lang = localStorage.getItem('botai_lang') || 'fa';
     setLang(lang);
     document.documentElement.dataset.dir = lang === 'fa' ? 'rtl' : 'ltr';
-  }, []);
+  }, [lang]);
 
   // session bootstrap
   useEffect(() => {
@@ -50,7 +50,10 @@ export function StoreProvider({ children }) {
   };
 
   return (
-    <StoreContext.Provider value={{ theme, setTheme: setThemeState, me, setMe, authReady, login, logout, toast, toasts }}>
+    <StoreContext.Provider value={{
+      theme, setTheme: setThemeState, lang, setLang: setLangState,
+      me, setMe, authReady, login, logout, toast, toasts,
+    }}>
       {children}
     </StoreContext.Provider>
   );

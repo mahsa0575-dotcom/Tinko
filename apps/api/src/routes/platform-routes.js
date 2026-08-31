@@ -2,15 +2,16 @@
 export async function registerPlatformRoutes(fastify, { ctx }) {
   const { repos, pool, router } = ctx;
   const guard = (perm) => ({ onRequest: [fastify.authenticate, fastify.requirePermission(perm)] });
+  const tenantId = (req) => req.admin.tenantId;
 
   // ---------- Analytics ----------
   fastify.get('/analytics/summary', guard('analytics.read'), async (req) => {
     const since = new Date(Date.now() - 24 * 3600 * 1000);
     const [usage, groups, users, messages] = await Promise.all([
-      repos.ops.usageSummary(1, since),
-      pool.query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE last_activity > now() - interval '24 hours')::int AS active_24h FROM telegram_groups WHERE tenant_id = 1 AND status <> 'orphaned'`),
-      pool.query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE last_seen_at > now() - interval '24 hours')::int AS active_24h FROM telegram_users WHERE tenant_id = 1`),
-      pool.query(`SELECT count(*)::int AS n FROM messages WHERE tenant_id = 1 AND created_at > now() - interval '24 hours'`),
+      repos.ops.usageSummary(tenantId(req), since),
+      pool.query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE last_activity > now() - interval '24 hours')::int AS active_24h FROM telegram_groups WHERE tenant_id = $1 AND status <> 'orphaned'`, [tenantId(req)]),
+      pool.query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE last_seen_at > now() - interval '24 hours')::int AS active_24h FROM telegram_users WHERE tenant_id = $1`, [tenantId(req)]),
+      pool.query(`SELECT count(*)::int AS n FROM messages WHERE tenant_id = $1 AND created_at > now() - interval '24 hours'`, [tenantId(req)]),
     ]);
     return {
       usage: usage,
@@ -30,22 +31,22 @@ export async function registerPlatformRoutes(fastify, { ctx }) {
         : 'count(*) FILTER (WHERE status = \'error\')';
       const { rows } = await pool.query(
         `SELECT date_trunc('hour', created_at) AS bucket, ${agg}::float AS value
-         FROM usage_records WHERE tenant_id = 1 AND created_at >= $1
-         GROUP BY bucket ORDER BY bucket`, [since]);
+         FROM usage_records WHERE tenant_id = $1 AND created_at >= $2
+         GROUP BY bucket ORDER BY bucket`, [tenantId(req), since]);
       return rows;
     }
     if (metric === 'messages') {
       const { rows } = await pool.query(
         `SELECT date_trunc('hour', created_at) AS bucket, count(*)::float AS value
-         FROM messages WHERE tenant_id = 1 AND created_at >= $1
-         GROUP BY bucket ORDER BY bucket`, [since]);
+         FROM messages WHERE tenant_id = $1 AND created_at >= $2
+         GROUP BY bucket ORDER BY bucket`, [tenantId(req), since]);
       return rows;
     }
     if (metric === 'moderation') {
       const { rows } = await pool.query(
         `SELECT date_trunc('hour', created_at) AS bucket, count(*)::float AS value
-         FROM moderation_events WHERE tenant_id = 1 AND created_at >= $1
-         GROUP BY bucket ORDER BY bucket`, [since]);
+         FROM moderation_events WHERE tenant_id = $1 AND created_at >= $2
+         GROUP BY bucket ORDER BY bucket`, [tenantId(req), since]);
       return rows;
     }
     throw Errors.validation([{ message: 'unknown metric' }]);
@@ -54,15 +55,15 @@ export async function registerPlatformRoutes(fastify, { ctx }) {
   // ---------- Audit ----------
   fastify.get('/audit', guard('logs.read'), async (req) => {
     const { limit = 50, offset = 0 } = req.query;
-    return repos.ops.listAudit(1, { limit: Math.min(Number(limit), 200), offset: Number(offset) });
+    return repos.ops.listAudit(tenantId(req), { limit: Math.min(Number(limit), 200), offset: Number(offset) });
   });
 
   // ---------- Notifications ----------
   fastify.get('/notifications', guard('logs.read'), async (req) =>
-    repos.ops.listNotifications(1, { status: req.query.status, limit: Math.min(Number(req.query.limit) || 50, 200) }));
+    repos.ops.listNotifications(tenantId(req), { status: req.query.status, limit: Math.min(Number(req.query.limit) || 50, 200) }));
 
   fastify.post('/notifications/:id/acknowledge', guard('logs.read'), async (req) => {
-    await pool.query(`UPDATE notifications SET status = 'acknowledged' WHERE id = $1 AND tenant_id = 1`, [req.params.id]);
+    await pool.query(`UPDATE notifications SET status = 'acknowledged' WHERE id = $1 AND tenant_id = $2`, [req.params.id, tenantId(req)]);
     return { ok: true };
   });
 
@@ -145,8 +146,8 @@ export async function registerPlatformRoutes(fastify, { ctx }) {
        LEFT JOIN providers p ON p.id = u.provider_id
        LEFT JOIN models m ON m.id = u.model_id
        LEFT JOIN telegram_groups g ON g.id = u.group_id
-       WHERE u.tenant_id = 1 AND u.created_at >= $1
-       ORDER BY u.created_at DESC LIMIT 50000`, [since]);
+       WHERE u.tenant_id = $1 AND u.created_at >= $2
+       ORDER BY u.created_at DESC LIMIT 50000`, [tenantId(req), since]);
 
     const filename = `botai-usage-${new Date().toISOString().slice(0, 10)}`;
     if (format === 'json') {

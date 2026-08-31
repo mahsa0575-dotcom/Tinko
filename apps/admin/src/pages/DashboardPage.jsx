@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { fmtNum, t } from '../lib/i18n.js';
 import { MetricCard, Chart, StatusBadge, PageHeader } from '../components/ui.jsx';
@@ -12,12 +12,18 @@ export function DashboardPage() {
   const [resources, setResources] = useState(null);
   const [health, setHealth] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api('/analytics/summary').then(setSummary).catch((e) => toast(e.message, 'error'));
     api('/analytics/timeseries?metric=ai_requests&hours=24').then(setSeries).catch(() => {});
     api('/resources/latest').then(setResources).catch(() => {});
     api('/system/health').then(setHealth).catch(() => {});
   }, [toast]);
+
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 30_000);
+    return () => clearInterval(timer);
+  }, [load]);
 
   const cpuPct = resources?.available ? Math.round(resources.cpu_percent) : null;
   const ramPct = resources?.available ? Math.round((resources.mem_used / resources.mem_total) * 100) : null;
@@ -26,7 +32,8 @@ export function DashboardPage() {
 
   return (
     <div className="page">
-      <PageHeader icon="dashboard" title={t('dashboard')} subtitle={t('last_24h')} />
+      <PageHeader icon="dashboard" title={t('dashboard')} subtitle={t('last_24h')}
+        actions={<button className="btn sm" onClick={load}><Icon name="refresh" size={13} /> {t('refresh')}</button>} />
 
       <div className="grid grid-cards" style={{ marginBottom: 20 }}>
         <MetricCard icon="users" label={t('total_groups')} value={fmtNum(summary?.groups?.total ?? 0)} hint={`${t('active_groups')}: ${fmtNum(summary?.groups?.active_24h ?? 0)}`} />

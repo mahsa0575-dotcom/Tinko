@@ -29,7 +29,7 @@ const NAV = [
 ];
 
 export function AppShell({ children }) {
-  const { me, logout, theme, setTheme, toasts } = useStore();
+  const { me, logout, theme, setTheme, lang, setLang, toasts } = useStore();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -47,6 +47,7 @@ export function AppShell({ children }) {
       run: (nav) => nav(item.to),
     })),
     { icon: theme === 'dark' ? 'sun' : 'moon', label: `${t('theme')}: ${t(theme)}`, run: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
+    { icon: 'globe', label: lang === 'fa' ? 'English' : 'فارسی', run: () => setLang(lang === 'fa' ? 'en' : 'fa') },
   ];
 
   const initial = (me?.email ?? '?').trim().charAt(0).toUpperCase();
@@ -97,6 +98,10 @@ export function AppShell({ children }) {
           <button className="btn sm ghost icon" title={t('theme')}
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
+          </button>
+          <button className="btn sm ghost language-toggle" title={t('language')}
+            onClick={() => setLang(lang === 'fa' ? 'en' : 'fa')}>
+            <Icon name="globe" size={15} /> {lang === 'fa' ? 'EN' : 'فا'}
           </button>
         </header>
         <main className="content">{children}</main>

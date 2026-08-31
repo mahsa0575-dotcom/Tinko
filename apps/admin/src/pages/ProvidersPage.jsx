@@ -33,8 +33,9 @@ export function ProvidersPage() {
 
   const save = async () => {
     try {
-      if (form.config.responsePath === '') delete form.config.responsePath;
-      await api('/providers', { method: 'POST', body: form });
+      const config = { ...form.config };
+      if (!config.responsePath) delete config.responsePath;
+      await api('/providers', { method: 'POST', body: { ...form, config } });
       toast(t('saved'), 'success');
       setCreating(false);
       load();
