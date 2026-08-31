@@ -18,7 +18,12 @@ err()  { echo "${RED}✖${RESET} $*"; }
 info() { echo "${BLUE}➜${RESET} $*"; }
 
 # ---------- paths ----------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks (installed as /usr/local/bin/tinko → /opt/tinko/tinko)
+SELF="${BASH_SOURCE[0]:-$0}"
+if command -v readlink >/dev/null 2>&1; then
+  SELF="$(readlink -f "$SELF" 2>/dev/null || echo "$SELF")"
+fi
+SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
 cd "$SCRIPT_DIR"
 ENV_FILE=".env"
 COMPOSE="docker compose"
