@@ -102,16 +102,16 @@
 }
 .auth-aurora {
   position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5;
-    animation: orb-float 14s ease-in-out infinite alternate; }
-  .orb-1 { width: 480px; height: 480px; top: -160px; inset-inline-start: -120px;
-    background: radial-gradient(circle, rgba(99, 102, 241, .5), transparent 65%); }
-  .orb-2 { width: 420px; height: 420px; bottom: -140px; inset-inline-end: -100px;
-    background: radial-gradient(circle, rgba(34, 211, 238, .34), transparent 65%);
-    animation-delay: -5s; }
-  .orb-3 { width: 300px; height: 300px; bottom: 10%; inset-inline-start: 24%;
-    background: radial-gradient(circle, rgba(139, 92, 246, .3), transparent 65%);
-    animation-delay: -9s; }
+  .orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: .42;
+    animation: orb-float 16s ease-in-out infinite alternate; }
+  .orb-1 { width: 500px; height: 500px; top: -170px; inset-inline-start: -120px;
+    background: radial-gradient(circle, rgba(47, 107, 255, .45), transparent 65%); }
+  .orb-2 { width: 430px; height: 430px; bottom: -150px; inset-inline-end: -110px;
+    background: radial-gradient(circle, rgba(56, 163, 248, .3), transparent 65%);
+    animation-delay: -6s; }
+  .orb-3 { width: 320px; height: 320px; bottom: 8%; inset-inline-start: 26%;
+    background: radial-gradient(circle, rgba(28, 79, 214, .3), transparent 65%);
+    animation-delay: -10s; }
 }
 @keyframes orb-float { from { transform: translate(0, 0) scale(1); } to { transform: translate(26px, -30px) scale(1.08); } }
 

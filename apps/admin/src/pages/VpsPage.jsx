@@ -68,8 +68,9 @@ export function VpsPage() {
     );
   }
 
-  const memPct = (latest.mem_used / latest.mem_total) * 100;
-  const swapPct = latest.swap_total > 0 ? (latest.swap_used / latest.swap_total) * 100 : 0;
+  // Null-safe: missing measurements render as "unavailable", never zero (spec §186).
+  const memPct = latest.mem_total > 0 ? (latest.mem_used / latest.mem_total) * 100 : null;
+  const swapPct = (latest.swap_total ?? 0) > 0 ? ((latest.swap_used ?? 0) / latest.swap_total) * 100 : 0;
   const rx = (latest.net ?? []).reduce((s, n) => s + (n.rx_bps ?? 0), 0);
   const tx = (latest.net ?? []).reduce((s, n) => s + (n.tx_bps ?? 0), 0);
   const rootDisk = (latest.disks ?? []).find((d) => d.mount === '/') ?? (latest.disks ?? [])[0];

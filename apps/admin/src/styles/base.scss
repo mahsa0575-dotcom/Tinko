@@ -47,9 +47,11 @@ body::after {
 
 h1, h2, h3, h4 { margin: 0; font-weight: 800; letter-spacing: -.01em; }
 a { color: var(--primary); text-decoration: none; }
+a:hover { color: var(--primary-hover); }
 code {
   background: var(--surface-3); padding: 1px 6px; border-radius: 6px;
   font-size: 12px; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  direction: ltr; unicode-bidi: embed;
 }
 kbd {
   font-family: ui-monospace, monospace; font-size: 10px;

@@ -76,11 +76,15 @@ export async function buildServer(overrides = {}) {
       });
     }
 
+    // AppError → its own code/status. Other 4xx client errors (body limits,
+    // malformed cookies, …) pass through with BAD_REQUEST; only real 5xx
+    // hide their internals.
     const isApp = err.name === 'AppError';
-    const status = isApp ? err.status ?? err.statusCode ?? 500 : 500;
-    const code = isApp && err.code ? err.code : 'INTERNAL_ERROR';
-    const message = isApp ? err.message : 'Internal server error';
-    if (!isApp) log.error('unhandled_error', { ...req.logContext, error: err.message, stack: err.stack });
+    const isClient = isApp || (err.statusCode != null && err.statusCode >= 400 && err.statusCode < 500);
+    const status = isClient ? err.statusCode ?? 500 : 500;
+    const code = isApp && err.code ? err.code : (isClient ? 'BAD_REQUEST' : 'INTERNAL_ERROR');
+    const message = isClient ? err.message : 'Internal server error';
+    if (!isClient) log.error('unhandled_error', { ...req.logContext, error: err.message, stack: err.stack });
     else if (status >= 400) log.warn('request_error', { ...req.logContext, code, error: err.message });
     reply.status(status).send({
       error: { code, message, request_id: req.id, details: err.details ?? undefined },

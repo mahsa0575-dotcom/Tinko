@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { fmtNum } from '../lib/i18n.js';
 import { Icon } from './icons.jsx';
 
@@ -27,14 +27,18 @@ export function DataTable({ columns, rows, pageSize = 15, emptyText, loading }) 
   const sorted = useMemo(() => {
     if (!sort) return rows ?? [];
     const col = columns[sort.index];
+    if (!col) return rows ?? [];
     const factor = sort.dir === 'asc' ? 1 : -1;
-    return [...rows].sort((a, b) => {
+    return [...(rows ?? [])].sort((a, b) => {
       const va = a[col.key], vb = b[col.key];
       return (typeof va === 'number' && typeof vb === 'number')
         ? (va - vb) * factor
         : String(va ?? '').localeCompare(String(vb ?? '')) * factor;
     });
   }, [rows, sort, columns]);
+
+  // Reset page when the dataset shrinks below the current page
+  useEffect(() => { setPage((p) => Math.min(p, Math.max(0, Math.ceil((rows?.length ?? 0) / pageSize) - 1))); }, [rows?.length, pageSize]);
 
   const pageRows = sorted.slice(page * pageSize, (page + 1) * pageSize);
   const pages = Math.max(1, Math.ceil(sorted.length / pageSize));

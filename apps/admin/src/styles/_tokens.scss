@@ -1,88 +1,100 @@
 // ============================================================
-// BotAI Design System — tokens
-// Premium "deep space + electric indigo" identity.
-// Dark is the primary enterprise theme; light mode is designed
-// independently (not an inversion). All colors are semantic.
+// Tinko Design System — Enterprise Blue
+// A formal, precise, all-blue identity. No purple, no indigo,
+// no neon. Dark = primary navy theme; Light = corporate white-blue.
+// All colors are semantic tokens.
 // ============================================================
 
 :root, [data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #070b14;
+  --bg: #0a101f;
   --bg-glow:
-    radial-gradient(1100px 520px at 88% -12%, rgba(99, 102, 241, .13), transparent 62%),
-    radial-gradient(900px 480px at -8% 108%, rgba(14, 165, 233, .09), transparent 58%),
-    radial-gradient(620px 340px at 50% 0%, rgba(139, 92, 246, .05), transparent 70%);
-  --surface: #0d1424;
-  --surface-2: #111a2e;
-  --surface-3: #17233c;
-  --surface-hover: #1a2743;
-  --border: #1d2a45;
-  --border-strong: #2c3d61;
+    radial-gradient(1100px 460px at 50% -160px, rgba(47, 107, 255, .12), transparent 68%),
+    radial-gradient(900px 420px at -10% 110%, rgba(56, 163, 248, .06), transparent 60%);
+  --surface: #0e1628;
+  --surface-2: #131e38;
+  --surface-3: #182750;
+  --surface-hover: #1b2b55;
+  --border: #1c2a4e;
+  --border-strong: #2a3d6e;
 
-  --text: #e9eefb;
-  --text-muted: #93a3c4;
-  --text-faint: #5c6f93;
+  --text: #eaf0fd;
+  --text-muted: #93a5c8;
+  --text-faint: #5f719a;
 
-  --primary: #6366f1;
-  --primary-hover: #7c7df5;
-  --primary-soft: rgba(99, 102, 241, .14);
-  --primary-glow: rgba(99, 102, 241, .4);
+  --primary: #2f6bff;
+  --primary-hover: #4d80ff;
+  --primary-deep: #1c4fd6;
+  --primary-soft: rgba(47, 107, 255, .13);
+  --primary-glow: rgba(47, 107, 255, .38);
   --primary-contrast: #ffffff;
-  --accent: #22d3ee;
-  --accent-soft: rgba(34, 211, 238, .12);
-  --brand-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #22d3ee 115%);
+  --accent: #38a3f8;
+  --accent-soft: rgba(56, 163, 248, .12);
+  // strict blue brand ramp — no purple anywhere
+  --brand-gradient: linear-gradient(135deg, #4d80ff 0%, #2f6bff 45%, #1c4fd6 100%);
 
-  --success: #34d399; --success-soft: rgba(52, 211, 153, .13);
-  --warning: #fbbf24; --warning-soft: rgba(251, 191, 36, .13);
-  --danger:  #f87171; --danger-soft:  rgba(248, 113, 113, .13);
-  --info:    #38bdf8; --info-soft:    rgba(56, 189, 248, .13);
+  --success: #2fbf71; --success-soft: rgba(47, 191, 113, .13);
+  --warning: #e8a13c; --warning-soft: rgba(232, 161, 60, .13);
+  --danger:  #e5484d; --danger-soft:  rgba(229, 72, 77, .13);
+  --info:    #38a3f8; --info-soft:    rgba(56, 163, 248, .13);
 
-  --shadow-1: 0 1px 2px rgba(1, 4, 12, .5);
-  --shadow-2: 0 10px 34px rgba(1, 4, 12, .55), 0 2px 8px rgba(1, 4, 12, .35);
-  --shadow-3: 0 22px 60px rgba(1, 4, 12, .62), 0 4px 14px rgba(1, 4, 12, .4);
-  --ring: 0 0 0 3px rgba(99, 102, 241, .3);
-  --glass: rgba(13, 20, 36, .78);
+  --sidebar-bg: #0b1224;
+  --topbar-bg: rgba(10, 16, 31, .85);
+  --logo-grad: linear-gradient(135deg, #4d80ff, #1c4fd6);
+
+  --shadow-1: 0 1px 2px rgba(2, 6, 18, .5);
+  --shadow-2: 0 12px 34px rgba(2, 6, 18, .55), 0 2px 8px rgba(2, 6, 18, .35);
+  --shadow-3: 0 22px 60px rgba(2, 6, 18, .62), 0 4px 14px rgba(2, 6, 18, .4);
+  --shadow-blue: 0 6px 18px rgba(47, 107, 255, .28);
+  --ring: 0 0 0 3px rgba(77, 128, 255, .32);
+  --glass: rgba(14, 22, 40, .82);
   --ease: cubic-bezier(.22, .8, .32, 1);
 }
 
 [data-theme='light'] {
   color-scheme: light;
 
-  --bg: #f3f5fc;
+  --bg: #eef2f9;
   --bg-glow:
-    radial-gradient(1100px 520px at 88% -12%, rgba(99, 102, 241, .09), transparent 62%),
-    radial-gradient(900px 480px at -8% 108%, rgba(14, 165, 233, .07), transparent 58%);
+    radial-gradient(1100px 460px at 50% -160px, rgba(47, 107, 255, .08), transparent 68%),
+    radial-gradient(900px 420px at -10% 110%, rgba(56, 163, 248, .05), transparent 60%);
   --surface: #ffffff;
-  --surface-2: #f6f8fe;
-  --surface-3: #eef1fb;
-  --surface-hover: #e8edf9;
-  --border: #e2e8f6;
-  --border-strong: #c8d2ea;
+  --surface-2: #f5f7fc;
+  --surface-3: #eaeff9;
+  --surface-hover: #e2eaf8;
+  --border: #e1e7f2;
+  --border-strong: #c9d4ea;
 
-  --text: #131a2c;
-  --text-muted: #5b6a88;
-  --text-faint: #98a4bd;
+  --text: #0f1b33;
+  --text-muted: #52627f;
+  --text-faint: #8fa0bd;
 
-  --primary: #5155e8;
-  --primary-hover: #4346d6;
-  --primary-soft: rgba(81, 85, 232, .09);
-  --primary-glow: rgba(81, 85, 232, .28);
+  --primary: #1a56db;
+  --primary-hover: #1447b8;
+  --primary-deep: #0f3a9e;
+  --primary-soft: rgba(26, 86, 219, .09);
+  --primary-glow: rgba(26, 86, 219, .26);
   --primary-contrast: #ffffff;
-  --accent: #0891b2;
-  --accent-soft: rgba(8, 145, 178, .09);
-  --brand-gradient: linear-gradient(135deg, #5155e8 0%, #7c5cf0 50%, #0891b2 115%);
+  --accent: #0369a1;
+  --accent-soft: rgba(3, 105, 161, .09);
+  --brand-gradient: linear-gradient(135deg, #2f6bff 0%, #1a56db 55%, #0f3a9e 100%);
 
-  --success: #0f9d6a; --success-soft: rgba(15, 157, 106, .1);
-  --warning: #c07a04; --warning-soft: rgba(192, 122, 4, .1);
-  --danger:  #dc3d43; --danger-soft:  rgba(220, 61, 67, .09);
+  --success: #17864b; --success-soft: rgba(23, 134, 75, .1);
+  --warning: #b45309; --warning-soft: rgba(180, 83, 9, .1);
+  --danger:  #dc2626; --danger-soft:  rgba(220, 38, 38, .09);
   --info:    #0369a1; --info-soft:    rgba(3, 105, 161, .09);
 
-  --shadow-1: 0 1px 2px rgba(19, 26, 44, .07);
-  --shadow-2: 0 10px 30px rgba(19, 26, 44, .1), 0 2px 6px rgba(19, 26, 44, .06);
-  --shadow-3: 0 22px 56px rgba(19, 26, 44, .14), 0 4px 12px rgba(19, 26, 44, .08);
-  --ring: 0 0 0 3px rgba(81, 85, 232, .22);
-  --glass: rgba(255, 255, 255, .8);
+  --sidebar-bg: #ffffff;
+  --topbar-bg: rgba(255, 255, 255, .88);
+  --logo-grad: linear-gradient(135deg, #2f6bff, #0f3a9e);
+
+  --shadow-1: 0 1px 2px rgba(15, 27, 51, .07);
+  --shadow-2: 0 12px 34px rgba(15, 27, 51, .11), 0 2px 8px rgba(15, 27, 51, .06);
+  --shadow-3: 0 22px 56px rgba(15, 27, 51, .14), 0 4px 12px rgba(15, 27, 51, .08);
+  --shadow-blue: 0 6px 18px rgba(26, 86, 219, .18);
+  --ring: 0 0 0 3px rgba(26, 86, 219, .25);
+  --glass: rgba(255, 255, 255, .85);
   --ease: cubic-bezier(.22, .8, .32, 1);
 }
 

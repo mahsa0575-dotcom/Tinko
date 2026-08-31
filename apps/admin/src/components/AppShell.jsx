@@ -57,7 +57,7 @@ export function AppShell({ children }) {
         <div className="brand">
           <div className="logo"><LogoMark size={20} /></div>
           <div>
-            <div className="brand-name">BotAI</div>
+            <div className="brand-name">Tinko</div>
             <div className="brand-sub">AI Telegram Platform</div>
           </div>
         </div>
