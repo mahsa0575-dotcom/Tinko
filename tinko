@@ -106,8 +106,12 @@ EOF
   fi
   info "نصب پیش‌نیازها (docker در صورت نبود)…"
   install_docker_if_missing
-  info "بیلد و اجرا (نصب کامل خودکار داخل Docker)…"
-  $COMPOSE up -d --build
+  info "بیلد ایمیج‌ها (به‌ترتیب — مناسب VPSهای کم‌رم)…"
+  $COMPOSE build api
+  $COMPOSE build bot
+  $COMPOSE build worker
+  info "اجرا…"
+  $COMPOSE up -d
   wait_healthy
   final_banner
 }
@@ -193,8 +197,10 @@ cmd_update() {
   require_env
   info "دریافت کد جدید…"
   git pull --ff-only 2>/dev/null || warn "پوشه‌ی git نیست — فایل‌ها را دستی به‌روزرسانی کن"
-  info "بیلد و اجرای مجدد…"
-  $COMPOSE up -d --build
+  info "بیلد ایمیج‌ها (به‌ترتیب)…"
+  $COMPOSE build api && $COMPOSE build bot && $COMPOSE build worker
+  info "اجرا…"
+  $COMPOSE up -d
   wait_healthy
   ok "به‌روزرسانی کامل شد (مایگریشن‌ها خودکار اعمال شدند)"
 }
