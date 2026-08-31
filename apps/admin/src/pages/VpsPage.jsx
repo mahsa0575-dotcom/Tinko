@@ -1,12 +1,46 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { fmtNum, fmtBytes, fmtTime, t } from '../lib/i18n.js';
-import { MetricCard, Chart, StatusBadge, Progress } from '../components/ui.jsx';
+import {
+  Chart, Progress, PageHeader, SectionCard, Modal, Field, Notice,
+  EmptyState, IconButton, LoadingBlock, CodeBlock,
+} from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
 import { Icon } from '../components/icons.jsx';
 
+const HEALTH_META = {
+  excellent: { kind: 'success', label: 'عالی' },
+  healthy: { kind: 'success', label: 'سالم' },
+  degraded: { kind: 'info', label: 'افت کیفیت' },
+  warning: { kind: 'warning', label: 'هشدار' },
+  critical: { kind: 'danger', label: 'بحرانی' },
+};
+
+const METRIC_LABEL = {
+  cpu: 'پردازنده', ram: 'حافظه', swap: 'سواپ', disk: 'دیسک', load: 'بار سیستم',
+};
+const LEVEL_LABEL = { warning: 'هشدار', high: 'بالا', critical: 'بحرانی' };
+
+/** Small gauge tile used in the VPS overview grid. */
+function GaugeTile({ icon, title, value, unit, pct, hint, accent }) {
+  return (
+    <div className="card tight vps-gauge-card" style={accent ? { '--accent': accent } : undefined}>
+      <div className="card-head">
+        <span className="card-head-icon"><Icon name={icon} size={15} /></span>
+        <span className="card-title">{title}</span>
+      </div>
+      <div className="vps-value-row">
+        <span className="num">{value}</span>
+        {unit && <span className="unit">{unit}</span>}
+      </div>
+      {pct != null && <Progress pct={pct} />}
+      {hint && <span className="faint xs">{hint}</span>}
+    </div>
+  );
+}
+
 /**
- * Real-time VPS monitoring (spec §79–95).
+ * Real-time VPS monitoring.
  * Data comes from the worker's OS-level collector via /resources/*.
  * Updates every ~2s while the tab is visible; never fabricates values.
  */
@@ -29,7 +63,7 @@ export function VpsPage() {
   const saveThresholds = async () => {
     try {
       await api('/settings/resource-thresholds', { method: 'PUT', body: thresholds });
-      toast('آستانه‌ها ذخیره شد', 'success');
+      toast('آستانه‌های هشدار ذخیره شد', 'success');
       setShowThresholds(false);
     } catch (err) { toast(err.message, 'error'); }
   };
@@ -56,35 +90,49 @@ export function VpsPage() {
   }, [paused]);
 
   if (!latest && !lastError) {
-    return <div className="page"><div className="skeleton" style={{ height: 300 }} /></div>;
-  }
-  if (!latest) {
     return (
       <div className="page">
-        <h1 className="page-title"><span className="title-icon"><Icon name="server" size={20} /></span>{t('vps')}</h1>
-        <div className="card"><div className="empty">
-          <div className="empty-icon"><Icon name="globe" size={24} /></div>
-          <div className="empty-title">{t('unavailable')}</div>
-          <div className="muted" style={{ maxWidth: 520, margin: '0 auto' }}>{lastError}</div>
-          {diag && (
-            <div className="notice info mt" style={{ textAlign: 'start', maxWidth: 520, margin: '16px auto 0' }}>
-              <Icon name="info" size={15} />
-              <div>
-                <div>سرویس worker: <strong>{diag.alive ? 'در حال اجرا' : 'خارج از دسترس'}</strong></div>
-                {diag.lastSeenAt && <div className="faint" style={{ fontSize: 12 }}>آخرین heartbeat: {fmtTime(diag.lastSeenAt)}</div>}
-                {!diag.alive && (
-                  <div className="faint mono" dir="ltr" style={{ fontSize: 11.5, marginTop: 6 }}>docker compose up -d worker</div>
-                )}
-              </div>
-            </div>
-          )}
-          <button className="btn primary mt" onClick={() => setPaused((p) => !p)}><Icon name="refresh" size={14} /> {t('refresh')}</button>
-        </div></div>
+        <PageHeader icon="server" title={t('vps')} subtitle="در حال دریافت متریک‌های زنده…" />
+        <LoadingBlock rows={6} />
       </div>
     );
   }
 
-  // Null-safe: missing measurements render as "unavailable", never zero (spec §186).
+  if (!latest) {
+    return (
+      <div className="page">
+        <PageHeader icon="server" title={t('vps')} subtitle="پایش منابع سرور" />
+        <SectionCard accent="warning" icon="alert" title="متریک‌ها در دسترس نیست">
+          <div className="col">
+            <EmptyState icon="server" title={t('unavailable')} text={lastError} />
+            {diag && (
+              <>
+                <Notice kind={diag.alive ? 'info' : 'bad'}
+                  title={`سرویس worker: ${diag.alive ? 'در حال اجرا' : 'خارج از دسترس'}`}>
+                  {diag.lastSeenAt
+                    ? `آخرین ضربان دریافتی: ${fmtTime(diag.lastSeenAt)}`
+                    : 'هیچ ضربانی از سرویس جمع‌آورندهٔ متریک دریافت نشده است.'}
+                </Notice>
+                {!diag.alive && (
+                  <CodeBlock title="برای راه‌اندازی سرویس، این دستور را اجرا کنید" copyable compact>
+                    docker compose up -d worker
+                  </CodeBlock>
+                )}
+              </>
+            )}
+            <div className="row">
+              <div className="spacer" />
+              <button className="btn primary" onClick={() => setPaused((p) => !p)}>
+                <Icon name="refresh" size={14} /> {t('refresh')}
+              </button>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
+
+  // Null-safe: missing measurements render as "unavailable", never zero.
   const memPct = latest.mem_total > 0 ? (latest.mem_used / latest.mem_total) * 100 : null;
   const swapPct = (latest.swap_total ?? 0) > 0 ? ((latest.swap_used ?? 0) / latest.swap_total) * 100 : 0;
   const rx = (latest.net ?? []).reduce((s, n) => s + (n.rx_bps ?? 0), 0);
@@ -97,170 +145,181 @@ export function VpsPage() {
   const coreLabel = latest.cpuQuota ?? latest.cpu_quota ?? latest.cpu_cores;
 
   const pick = (arr, key) => (arr ?? []).map((row) => row[key]);
+  const health = HEALTH_META[latest.health?.score] ?? null;
 
   return (
     <div className="page">
-      <div className="row" style={{ marginBottom: 4 }}>
-        <h1 className="page-title"><span className="title-icon"><Icon name="server" size={20} /></span>{t('vps')}</h1>
-        <div className="spacer" />
-        {latest.health && (
-          <span className={`badge ${latest.health.score === 'excellent' || latest.health.score === 'healthy' ? 'success'
-            : latest.health.score === 'degraded' ? 'info' : latest.health.score === 'warning' ? 'warning' : 'danger'}`}>
-            <Icon name="heart" size={14} style={{ color: 'var(--success)' }} /> Health: {latest.health.score}
-          </span>
+      <PageHeader
+        icon="server"
+        title={t('vps')}
+        subtitle={`${latest.source === 'container' ? 'متریک‌های کانتینر' : 'متریک‌های هاست / VPS'}${
+          latest.ageMs != null ? ` · ${fmtNum(Math.round(latest.ageMs / 1000))} ثانیه پیش` : ''}`}
+        actions={(
+          <>
+            {health && (
+              <span className={`badge ${health.kind}`}>
+                <Icon name="heart" size={13} /> سلامت: {health.label}
+              </span>
+            )}
+            <span className="status-pill">
+              <span className={`pulse ${latest.stale ? 'warn' : 'ok'}`} />
+              {latest.stale ? 'کهنه' : t('live')} · {fmtTime(latest.captured_at)}
+            </span>
+            <IconButton icon={paused ? 'play' : 'pause'}
+              title={paused ? 'ادامهٔ پایش زنده' : 'توقف پایش زنده'}
+              active={paused} onClick={() => setPaused((p) => !p)} />
+            <IconButton icon="gauge" title="آستانه‌های هشدار" onClick={() => setShowThresholds(true)} />
+          </>
         )}
-        <button className="btn sm ghost" onClick={() => setShowThresholds(true)} title="آستانه‌های هشدار"><Icon name="settings" size={13} /></button>
-        <span className="status-pill">
-          <span className={`pulse ${latest.stale ? 'warn' : 'ok'}`} />
-          {latest.stale ? 'کهنه' : t('live')} · {fmtTime(latest.captured_at)}
-        </span>
-        <button className="btn sm ghost" onClick={() => setPaused((p) => !p)}
-          title={paused ? t('refresh') : t('live')}>
-          <Icon name={paused ? 'play' : 'pause'} size={13} />
-        </button>
-      </div>
-      <p className="page-subtitle">
-        {latest.source === 'container' ? 'متریک‌های کانتینر' : 'متریک‌های هاست / VPS'}
-        {latest.ageMs != null && ` · ${Math.round(latest.ageMs / 1000)} ثانیه پیش`}
-      </p>
+      />
 
       {latest.stale && (
-        <div className="notice warn" style={{ marginBottom: 16 }}>
-          <Icon name="alert" size={15} />
-          <div>
-            آخرین متریک بیش از یک دقیقه قدیمی است
-            {latest.worker && !latest.worker.alive && ' — سرویس worker heartbeat نمی‌فرستد'}.
-            اعداد زیر لحظه‌ای نیستند.
-          </div>
-        </div>
+        <Notice kind="warn" title="داده‌ها لحظه‌ای نیستند">
+          آخرین متریک بیش از یک دقیقه قدیمی است
+          {latest.worker && !latest.worker.alive && ' — سرویس worker ضربان نمی‌فرستد'}.
+          اعداد زیر ممکن است وضعیت فعلی سرور را نشان ندهند.
+        </Notice>
       )}
 
-      {/* Thresholds editor (spec §95) */}
-      {showThresholds && thresholds && (
-        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setShowThresholds(false)}>
-          <div className="modal" role="dialog" aria-modal="true">
-            <div className="modal-head">
-              <h3><Icon name="gauge" size={16} /> آستانه‌های هشدار منابع</h3>
-              <button className="btn sm ghost" onClick={() => setShowThresholds(false)}><Icon name="x" size={13} /></button>
-            </div>
-            <p className="muted" style={{ fontSize: 12 }}>درصد برای CPU/RAM/SWAP/دیسک؛ نسبت به تعداد هسته برای LOAD (مثلاً 1.5 = 150٪ ظرفیت).</p>
-            {['cpu', 'ram', 'swap', 'disk', 'load'].map((metric) => (
-              <div key={metric} className="row" style={{ marginBottom: 8 }}>
-                <span className="mono" style={{ width: 60, textTransform: 'uppercase' }}>{metric}</span>
-                {['warning', 'high', 'critical'].map((level) => (
-                  <label key={level} className="row" style={{ fontSize: 11 }}>
-                    {level}
-                    <input className="input" type="number" step="0.1" style={{ width: 76 }}
-                      value={thresholds[metric]?.[level] ?? ''}
-                      onChange={(e) => setThresholds({
-                        ...thresholds,
-                        [metric]: { ...thresholds[metric], [level]: Number(e.target.value) },
-                      })} />
-                  </label>
-                ))}
-              </div>
-            ))}
-            <div className="row" style={{ justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={() => setShowThresholds(false)}>{t('cancel')}</button>
-              <button className="btn primary" onClick={saveThresholds}>{t('save')}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Top cards */}
+      {/* Overview gauges */}
       <div className="vps-top-cards">
-        <div className="card" style={{ padding: 14 }}>
-          <div className="card-title"><Icon name="cpu" size={14} /> {t('cpu')}</div>
-          <div className="vps-value-row">
-            <span className="big">{latest.cpu_percent != null ? `${fmtNum(latest.cpu_percent)}٪` : '—'}</span>
-          </div>
-          <Progress pct={latest.cpu_percent} />
-          <div className="muted" style={{ fontSize: 11 }}>
-            {fmtNum(coreLabel)} هسته
-            {latest.host_cores && latest.host_cores !== latest.cpu_cores && ` (هاست: ${fmtNum(latest.host_cores)})`}
-          </div>
-        </div>
-        <div className="card" style={{ padding: 14 }}>
-          <div className="card-title"><Icon name="ram" size={14} /> {t('ram')}</div>
-          <div className="vps-value-row">
-            <span className="big">{fmtBytes(latest.mem_used)}</span><span className="unit">/ {fmtBytes(latest.mem_total)}</span>
-          </div>
-          <Progress pct={memPct} />
-          <div className="muted" style={{ fontSize: 11 }}>{memPct != null ? `${fmtNum(memPct)}٪` : 'در دسترس نیست'}</div>
-        </div>
-        <div className="card" style={{ padding: 14 }}>
-          <div className="card-title"><Icon name="database" size={14} /> {t('swap')}</div>
-          <div className="vps-value-row">
-            <span className="big">{fmtBytes(latest.swap_used ?? 0)}</span><span className="unit">/ {fmtBytes(latest.swap_total ?? 0)}</span>
-          </div>
-          <Progress pct={swapPct} />
-        </div>
-        <div className="card" style={{ padding: 14 }}>
-          <div className="card-title"><Icon name="disk" size={14} /> {t('disk')}</div>
-          <div className="vps-value-row">
-            <span className="big">{fmtNum(rootDisk?.pct ?? 0)}٪</span>
-          </div>
-          <Progress pct={rootDisk?.pct} />
-          <div className="muted" style={{ fontSize: 11 }}>{rootDisk?.mount}</div>
-        </div>
-        <div className="card" style={{ padding: 14 }}>
-          <div className="card-title"><Icon name="globe" size={14} /> {t('network')}</div>
-          <div className="vps-value-row"><span className="big">{fmtBytes(rx)}</span><span className="unit">/s ↓</span></div>
-          <div className="vps-value-row"><span className="big">{fmtBytes(tx)}</span><span className="unit">/s ↑</span></div>
-        </div>
-        <div className="card" style={{ padding: 14 }}>
-          <div className="card-title"><Icon name="gauge" size={14} /> {t('load')}</div>
-          <div className="vps-value-row">
-            <span className="big">{load1 != null ? fmtNum(load1) : '—'}</span>
-            <span className="unit">/ {fmtNum(coreLabel)} هسته</span>
-          </div>
-          {loadRatio != null && <Progress pct={loadRatio * 100} />}
-        </div>
+        <GaugeTile icon="cpu" title={t('cpu')} accent="var(--success)"
+          value={latest.cpu_percent != null ? `${fmtNum(latest.cpu_percent)}٪` : '—'}
+          pct={latest.cpu_percent}
+          hint={`${fmtNum(coreLabel)} هسته${
+            latest.host_cores && latest.host_cores !== latest.cpu_cores
+              ? ` (هاست: ${fmtNum(latest.host_cores)})` : ''}`}
+        />
+        <GaugeTile icon="ram" title={t('ram')} accent="var(--accent)"
+          value={fmtBytes(latest.mem_used)} unit={`از ${fmtBytes(latest.mem_total)}`}
+          pct={memPct} hint={memPct != null ? `${fmtNum(memPct)}٪ مصرف` : 'در دسترس نیست'}
+        />
+        <GaugeTile icon="database" title={t('swap')} accent="var(--warning)"
+          value={fmtBytes(latest.swap_used ?? 0)} unit={`از ${fmtBytes(latest.swap_total ?? 0)}`}
+          pct={swapPct}
+          hint={(latest.swap_total ?? 0) > 0 ? `${fmtNum(swapPct)}٪ مصرف` : 'سواپ تنظیم نشده'}
+        />
+        <GaugeTile icon="disk" title={t('disk')} accent="var(--danger)"
+          value={`${fmtNum(rootDisk?.pct ?? 0)}٪`} pct={rootDisk?.pct}
+          hint={rootDisk?.mount ? `مسیر ${rootDisk.mount}` : undefined}
+        />
+        <GaugeTile icon="globe" title={t('network')} accent="var(--info)"
+          value={fmtBytes(rx)} unit="بر ثانیه دریافت"
+          hint={`ارسال: ${fmtBytes(tx)} بر ثانیه`}
+        />
+        <GaugeTile icon="gauge" title={t('load')} accent="var(--accent-2)"
+          value={load1 != null ? fmtNum(load1) : '—'} unit={`از ${fmtNum(coreLabel)} هسته`}
+          pct={loadRatio != null ? loadRatio * 100 : null}
+          hint={loadRatio != null ? `${fmtNum(Math.round(loadRatio * 100))}٪ ظرفیت` : undefined}
+        />
       </div>
 
       {/* History charts */}
       <div className="grid grid-2">
-        <div className="card"><div className="card-title"><Icon name="trendUp" size={14} /> CPU — 30min</div>
-          <Chart data={pick(history, 'cpu_percent')} height={110} /></div>
-        <div className="card"><div className="card-title"><Icon name="trendUp" size={14} /> {t('ram')} — 30min</div>
-          <Chart data={pick(history, 'mem_used')} height={110} color="var(--info)" /></div>
+        <SectionCard icon="trendUp" title="پردازنده" subtitle="۳۰ دقیقهٔ گذشته">
+          <Chart data={pick(history, 'cpu_percent')} height={130}
+            label={t('cpu')} format={(v) => `${fmtNum(Math.round(v))}٪`} />
+        </SectionCard>
+        <SectionCard icon="trendUp" title={t('ram')} subtitle="۳۰ دقیقهٔ گذشته">
+          <Chart data={pick(history, 'mem_used')} height={130} color="var(--info)"
+            label={t('ram')} format={fmtBytes} />
+        </SectionCard>
       </div>
 
-      <div className="grid grid-2 mt">
+      <div className="grid grid-2">
         {/* Processes */}
-        <div className="card">
-          <div className="card-title"><Icon name="settings" size={14} /> {t('processes')}</div>
-          <div className="table-wrap">
-            <table className="table">
-              <thead><tr><th>PID</th><th>Name</th><th>CPU٪</th><th>RAM</th></tr></thead>
-              <tbody>
-                {(latest.processes ?? []).map((p) => (
-                  <tr key={p.pid}>
-                    <td className="mono">{p.pid}</td>
-                    <td className="mono">{p.name}</td>
-                    <td>{fmtNum(p.cpu)}</td>
-                    <td>{fmtBytes(p.memBytes)}</td>
+        <SectionCard
+          icon="activity" title={t('processes')} subtitle="پرمصرف‌ترین فرایندها"
+          actions={<span className="badge neutral">{fmtNum((latest.processes ?? []).length)}</span>}
+        >
+          {(latest.processes ?? []).length === 0 ? (
+            <EmptyState icon="activity" title="فرایندی گزارش نشده است" />
+          ) : (
+            <div className="table-wrap">
+              <table className="table dense">
+                <thead>
+                  <tr>
+                    <th>شناسه</th><th>نام فرایند</th><th>پردازنده</th><th>حافظه</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {/* Disks */}
-        <div className="card">
-          <div className="card-title"><Icon name="disk" size={14} /> Filesystems</div>
-          {(latest.disks ?? []).map((d) => (
-            <div key={d.mount} className="mt" style={{ marginTop: 10 }}>
-              <div className="row" style={{ justifyContent: 'space-between', fontSize: 12 }}>
-                <span className="mono">{d.mount}</span>
-                <span className="muted">{fmtBytes(d.used)} / {fmtBytes(d.total)}</span>
-              </div>
-              <Progress pct={d.pct} />
+                </thead>
+                <tbody>
+                  {(latest.processes ?? []).map((p) => (
+                    <tr key={p.pid}>
+                      <td className="ltr faint xs">{p.pid}</td>
+                      <td className="cell-strong ltr">{p.name}</td>
+                      <td>{fmtNum(p.cpu)}٪</td>
+                      <td className="muted sm">{fmtBytes(p.memBytes)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-        </div>
+          )}
+        </SectionCard>
+
+        {/* Disks */}
+        <SectionCard icon="disk" title="فضای ذخیره‌سازی" subtitle="وضعیت پارتیشن‌ها">
+          {(latest.disks ?? []).length === 0 ? (
+            <EmptyState icon="disk" title="پارتیشنی گزارش نشده است" />
+          ) : (
+            <div className="col">
+              {(latest.disks ?? []).map((d) => (
+                <div key={d.mount} className="col tight">
+                  <div className="row tight">
+                    <span className="cell-strong ltr sm">{d.mount}</span>
+                    <div className="spacer" />
+                    <span className="muted xs">{fmtBytes(d.used)} / {fmtBytes(d.total)}</span>
+                    <span className={`badge ${d.pct >= 90 ? 'danger' : d.pct >= 75 ? 'warning' : 'neutral'}`}>
+                      {fmtNum(d.pct)}٪
+                    </span>
+                  </div>
+                  <Progress pct={d.pct} />
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
       </div>
+
+      {/* Thresholds editor */}
+      {showThresholds && thresholds && (
+        <Modal
+          title="آستانه‌های هشدار منابع"
+          icon="gauge"
+          onClose={() => setShowThresholds(false)}
+          footer={(
+            <>
+              <div className="spacer" />
+              <button className="btn" onClick={() => setShowThresholds(false)}>{t('cancel')}</button>
+              <button className="btn primary" onClick={saveThresholds}>{t('save')}</button>
+            </>
+          )}
+        >
+          <div className="col">
+            <Notice kind="info" title="واحد مقادیر">
+              برای پردازنده، حافظه، سواپ و دیسک عدد به درصد است؛ برای بار سیستم نسبت به تعداد
+              هسته است (مثلاً ۱٫۵ یعنی ۱۵۰٪ ظرفیت).
+            </Notice>
+
+            {['cpu', 'ram', 'swap', 'disk', 'load'].map((metric) => (
+              <SectionCard key={metric} flat icon="gauge" title={METRIC_LABEL[metric]}>
+                <div className="grid grid-3">
+                  {['warning', 'high', 'critical'].map((level) => (
+                    <Field key={level} label={LEVEL_LABEL[level]}>
+                      <input className="input" type="number" step="0.1"
+                        value={thresholds[metric]?.[level] ?? ''}
+                        onChange={(e) => setThresholds({
+                          ...thresholds,
+                          [metric]: { ...thresholds[metric], [level]: Number(e.target.value) },
+                        })} />
+                    </Field>
+                  ))}
+                </div>
+              </SectionCard>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

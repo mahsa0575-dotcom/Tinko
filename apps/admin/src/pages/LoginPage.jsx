@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../state/store.jsx';
 import { t } from '../lib/i18n.js';
 import { Icon, LogoMark } from '../components/icons.jsx';
-import { Spinner } from '../components/ui.jsx';
+import { Field, Spinner } from '../components/ui.jsx';
 
 export function LoginPage() {
   const { login, toast } = useStore();
@@ -10,6 +10,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [needsCode, setNeedsCode] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
@@ -36,35 +37,61 @@ export function LoginPage() {
         <div className="orb orb-2" />
         <div className="orb orb-3" />
       </div>
+
       <form className="auth-card" onSubmit={submit}>
         <div className="auth-logo">
-          <div className="logo"><LogoMark size={28} /></div>
+          <span className="logo"><LogoMark size={28} /></span>
           <h2>{t('login_title')}</h2>
           <div className="auth-tagline">{t('login_tagline')}</div>
         </div>
-        <div className="field">
-          <label htmlFor="email">{t('email')}</label>
-          <input id="email" className="input" type="email" dir="ltr" value={email} required
-            onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
-        </div>
-        <div className="field">
-          <label htmlFor="password">{t('password')}</label>
-          <input id="password" className="input" type="password" dir="ltr" value={password} required
-            onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-        </div>
-        {needsCode && (
-          <div className="field">
-            <label htmlFor="code">{t('totp_label')}</label>
-            <input id="code" className="input" dir="ltr" value={code}
-              onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" />
+
+        <Field label={t('email')} htmlFor="email" required>
+          <input
+            id="email" className="input" type="email" dir="ltr" value={email} required
+            placeholder="admin@example.com" autoComplete="username"
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
+
+        <Field label={t('password')} htmlFor="password" required>
+          <div className="input-icon">
+            <input
+              id="password" className="input" type={showPass ? 'text' : 'password'} dir="ltr"
+              value={password} required autoComplete="current-password"
+              style={{ paddingInlineEnd: 40, paddingInlineStart: 12 }}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button" className="icon-btn sm" aria-label="نمایش گذرواژه"
+              style={{ position: 'absolute', insetInlineEnd: 4 }}
+              onClick={() => setShowPass((v) => !v)}
+            >
+              <Icon name={showPass ? 'eyeOff' : 'eye'} size={15} />
+            </button>
           </div>
+        </Field>
+
+        {needsCode && (
+          <Field label={t('totp_label')} htmlFor="code" required>
+            <input
+              id="code" className="input mono" dir="ltr" value={code} inputMode="numeric"
+              placeholder="000000" autoComplete="one-time-code"
+              onChange={(e) => setCode(e.target.value)}
+            />
+          </Field>
         )}
-        <button className="btn primary" style={{ width: '100%', justifyContent: 'center', marginTop: 10, padding: '11px 15px', fontSize: 14 }} disabled={busy}>
-          {busy ? <><Spinner size={15} />{t('loading')}</> : <><Icon name="logout" size={16} style={{ transform: 'rotate(180deg)' }} />{t('login')}</>}
+
+        <button className="btn primary lg block" disabled={busy} style={{ marginTop: 6 }}>
+          {busy ? (
+            <><Spinner size={16} />{t('loading')}</>
+          ) : (
+            <><Icon name="logout" size={16} style={{ transform: 'scaleX(-1)' }} />{t('login')}</>
+          )}
         </button>
+
         <div className="auth-foot">
-          <Icon name="shieldCheck" size={12} style={{ verticalAlign: '-2px' }} />
-          {' '}اتصال امن · احراز هویت دوعاملی · دسترسی نقش‌محور
+          <Icon name="shieldCheck" size={13} />
+          اتصال امن · احراز هویت دوعاملی · دسترسی نقش‌محور
         </div>
       </form>
     </div>

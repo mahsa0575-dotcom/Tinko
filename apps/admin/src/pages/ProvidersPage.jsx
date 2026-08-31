@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { fmtNum, t } from '../lib/i18n.js';
-import { DataTable, StatusBadge, Modal } from '../components/ui.jsx';
+import {
+  DataTable, StatusBadge, Modal, PageHeader, Field, IconButton, List, ListRow,
+  EmptyState, Notice, Spinner, SectionCard, ConfirmDialog,
+} from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
 import { Icon } from '../components/icons.jsx';
+
+const KIND_LABEL = {
+  openai_compatible: 'سازگار با OpenAI',
+  anthropic: 'Anthropic',
+  custom_http: 'HTTP سفارشی',
+  mock: 'آزمایشی (Mock)',
+};
 
 /** Providers page: CRUD, API-key pool, connection test, custom HTTP builder. */
 export function ProvidersPage() {
@@ -16,12 +26,14 @@ export function ProvidersPage() {
   const [keys, setKeys] = useState([]);
   const [newKey, setNewKey] = useState('');
   const [testing, setTesting] = useState(null);
+  const [confirm, setConfirm] = useState(null);
 
   const load = useCallback(async () => {
-    try { setRows(await api('/providers')); }
-    catch (err) { toast(err.message, 'error'); }
+    try { setRows(await api('/providers')); } catch (err) { toast(err.message, 'error'); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
+
+  const closeForm = () => { setCreating(false); setEditingProvider(null); };
 
   const startCreate = () => {
     setForm({
@@ -52,13 +64,12 @@ export function ProvidersPage() {
         method: editingProvider ? 'PATCH' : 'POST', body: { ...form, config },
       });
       toast(t('saved'), 'success');
-      setCreating(false); setEditingProvider(null);
+      closeForm();
       load();
     } catch (err) { toast(err.message, 'error'); }
   };
 
   const remove = async (provider) => {
-    if (!window.confirm(`${t('confirm_delete')} (${provider.display_name})`)) return;
     try {
       await api(`/providers/${provider.id}`, { method: 'DELETE' });
       toast(t('deleted'), 'success');
@@ -70,17 +81,16 @@ export function ProvidersPage() {
     setTesting(provider.id);
     try {
       const result = await api(`/providers/${provider.id}/test`, { method: 'POST', body: {} });
-      toast(result.ok ? `متصل شد (${fmtNum(result.latencyMs)}ms)` : `${result.error}`, result.ok ? 'success' : 'error');
-    } catch (err) { toast(err.message, 'error'); }
-    finally { setTesting(null); }
+      toast(result.ok ? `متصل شد (${fmtNum(result.latencyMs)}ms)` : result.error, result.ok ? 'success' : 'error');
+    } catch (err) { toast(err.message, 'error'); } finally { setTesting(null); }
   };
 
   const openKeys = async (provider) => {
     setKeysFor(provider);
     setNewKey('');
-    try { setKeys(await api(`/providers/${provider.id}/keys`)); }
-    catch (err) { toast(err.message, 'error'); }
+    try { setKeys(await api(`/providers/${provider.id}/keys`)); } catch (err) { toast(err.message, 'error'); }
   };
+
   const addKey = async () => {
     if (!newKey.trim()) return;
     try {
@@ -90,146 +100,238 @@ export function ProvidersPage() {
       toast('کلید ذخیره شد (رمزنگاری‌شده)', 'success');
     } catch (err) { toast(err.message, 'error'); }
   };
+
   const toggleKey = async (key) => {
     try {
-      await api(`/providers/${keysFor.id}/keys/${key.id}`, { method: 'PATCH', body: { status: key.status === 'active' ? 'disabled' : 'active' } });
+      await api(`/providers/${keysFor.id}/keys/${key.id}`, {
+        method: 'PATCH', body: { status: key.status === 'active' ? 'disabled' : 'active' },
+      });
       setKeys(await api(`/providers/${keysFor.id}/keys`));
     } catch (err) { toast(err.message, 'error'); }
   };
 
+  const setCfg = (patch) => setForm((f) => ({ ...f, config: { ...f.config, ...patch } }));
+  const setAuth = (patch) => setCfg({ auth: { ...form.config.auth, ...patch } });
+
   return (
     <div className="page">
-      <div className="row">
-        <h1 className="page-title"><span className="title-icon"><Icon name="plug" size={20} /></span>{t('providers')}</h1>
-        <div className="spacer" />
-        <button className="btn primary" onClick={startCreate}>+ {t('add')}</button>
-      </div>
-      <p className="page-subtitle">OpenAI، Anthropic، DeepSeek، Groq، OpenRouter، Ollama یا هر API سفارشی دیگر</p>
+      <PageHeader
+        icon="plug"
+        title={t('providers')}
+        subtitle="OpenAI، Anthropic، DeepSeek، Groq، OpenRouter، Ollama یا هر API سفارشی دیگر را متصل کنید"
+        actions={
+          <>
+            <button className="btn sm" onClick={load}><Icon name="refresh" size={13} />{t('refresh')}</button>
+            <button className="btn sm primary" onClick={startCreate}><Icon name="plus" size={13} />{t('add')}</button>
+          </>
+        }
+      />
 
-      <DataTable loading={!rows} rows={rows} emptyText="هیچ تأمین‌کننده‌ای پیکربندی نشده است"
+      <DataTable
+        loading={!rows}
+        rows={rows}
+        emptyIcon="plug"
+        emptyText="هیچ تأمین‌کننده‌ای پیکربندی نشده است"
         columns={[
-          { key: 'display_name', label: 'Name', render: (p) => (
-            <div style={{ fontWeight: 600 }}>{p.display_name}<div className="faint mono" style={{ fontSize: 11 }}>{p.slug} · {p.kind}</div></div>
-          )},
-          { key: 'base_url', label: 'Base URL', render: (p) => <span className="mono" style={{ fontSize: 11 }}>{p.base_url ?? '—'}</span> },
-          { key: 'health', label: 'Health', render: (p) => <StatusBadge value={p.health} /> },
+          {
+            key: 'display_name',
+            label: t('col_name'),
+            render: (p) => (
+              <div className="col tight">
+                <span className="cell-strong">{p.display_name}</span>
+                <span className="faint mono xs">{p.slug} · {KIND_LABEL[p.kind] ?? p.kind}</span>
+              </div>
+            ),
+          },
+          {
+            key: 'base_url',
+            label: t('col_base_url'),
+            render: (p) => <span className="mono xs ltr cell-clip">{p.base_url ?? '—'}</span>,
+          },
+          { key: 'health', label: t('col_health'), render: (p) => <StatusBadge value={p.health} /> },
           { key: 'status', label: t('status'), render: (p) => <StatusBadge value={p.status} /> },
-          { key: 'actions', label: t('actions'), sortable: false, render: (p) => (
-            <div className="row">
-              <button className="btn sm" onClick={() => testProvider(p)} disabled={testing === p.id}>
-                {testing === p.id ? '…' : <><Icon name="zap" size={13} />تست</>}
-              </button>
-              <button className="btn sm" onClick={() => openKeys(p)}><Icon name="key" size={13} /> کلیدها</button>
-              <button className="btn sm" onClick={() => startEdit(p)} title={t('edit')}><Icon name="edit" size={13} /></button>
-              <button className="btn sm danger" onClick={() => remove(p)}><Icon name="trash" size={13} /></button>
-            </div>
-          )},
+          {
+            key: 'actions',
+            label: t('actions'),
+            sortable: false,
+            cellClass: 'actions-cell',
+            render: (p) => (
+              <div className="row tight">
+                <button className="btn xs" onClick={() => testProvider(p)} disabled={testing === p.id}>
+                  {testing === p.id ? <Spinner size={12} /> : <Icon name="zap" size={12} />}
+                  {t('test')}
+                </button>
+                <button className="btn xs" onClick={() => openKeys(p)}>
+                  <Icon name="key" size={12} />کلیدها
+                </button>
+                <IconButton small icon="edit" title={t('edit')} onClick={() => startEdit(p)} />
+                <IconButton small danger icon="trash" title={t('delete')}
+                  onClick={() => setConfirm({
+                    title: 'حذف تأمین‌کننده',
+                    message: `آیا از حذف «${p.display_name}» مطمئن هستید؟ مدل‌ها و کلیدهای وابسته نیز تحت تأثیر قرار می‌گیرند.`,
+                    run: () => remove(p),
+                  })} />
+              </div>
+            ),
+          },
         ]}
       />
 
       {creating && (
-        <Modal title={editingProvider ? `ویرایش ${editingProvider.display_name}` : 'تأمین‌کننده‌ی جدید'} onClose={() => { setCreating(false); setEditingProvider(null); }} wide>
+        <Modal
+          wide
+          icon="plug"
+          title={editingProvider ? `ویرایش «${editingProvider.display_name}»` : 'تأمین‌کنندهٔ جدید'}
+          onClose={closeForm}
+          footer={
+            <>
+              <div className="spacer" />
+              <button className="btn" onClick={closeForm}>{t('cancel')}</button>
+              <button className="btn primary" onClick={save} disabled={!form.slug || !form.display_name}>
+                <Icon name="save" size={14} />{t('save')}
+              </button>
+            </>
+          }
+        >
           <div className="grid grid-2">
-            <div className="field"><label>نامک (slug)</label>
-              <input className="input" dir="ltr" value={form.slug}
-                onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="my-provider" /></div>
-            <div className="field"><label>نام نمایشی</label>
+            <Field label="نامک (slug)" required hint="شناسهٔ یکتا و انگلیسی">
+              <input className="input mono" dir="ltr" value={form.slug} placeholder="my-provider"
+                onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+            </Field>
+            <Field label="نام نمایشی" required>
               <input className="input" value={form.display_name}
-                onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></div>
-            <div className="field"><label>نوع</label>
+                onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
+            </Field>
+            <Field label="نوع تأمین‌کننده">
               <select className="select" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-                <option value="openai_compatible">OpenAI-Compatible</option>
+                <option value="openai_compatible">سازگار با OpenAI</option>
                 <option value="anthropic">Anthropic</option>
-                <option value="custom_http">Custom HTTP (پیشرفته)</option>
-                <option value="mock">Mock (تست)</option>
-              </select></div>
-            <div className="field"><label>Base URL</label>
-              <input className="input" dir="ltr" value={form.base_url}
-                onChange={(e) => setForm({ ...form, base_url: e.target.value })}
-                placeholder="https://api.example.com/v1" /></div>
-            <div className="field"><label>Timeout (ms)</label>
+                <option value="custom_http">HTTP سفارشی (پیشرفته)</option>
+                <option value="mock">آزمایشی (Mock)</option>
+              </select>
+            </Field>
+            <Field label="آدرس پایه (Base URL)">
+              <input className="input mono" dir="ltr" value={form.base_url} placeholder="https://api.example.com/v1"
+                onChange={(e) => setForm({ ...form, base_url: e.target.value })} />
+            </Field>
+            <Field label="مهلت پاسخ (میلی‌ثانیه)">
               <input className="input" type="number" value={form.timeout_ms}
-                onChange={(e) => setForm({ ...form, timeout_ms: Number(e.target.value) })} /></div>
-            <div className="field"><label>Max retries</label>
+                onChange={(e) => setForm({ ...form, timeout_ms: Number(e.target.value) })} />
+            </Field>
+            <Field label="حداکثر تلاش مجدد">
               <input className="input" type="number" value={form.max_retries}
-                onChange={(e) => setForm({ ...form, max_retries: Number(e.target.value) })} /></div>
+                onChange={(e) => setForm({ ...form, max_retries: Number(e.target.value) })} />
+            </Field>
           </div>
 
           {form.kind === 'openai_compatible' && (
-            <div className="field" style={{ marginTop: 4 }}><label>مسیر Chat Completion</label>
-              <input className="input" dir="ltr" value={form.config.chatPath ?? '/v1/chat/completions'}
-                onChange={(e) => setForm({ ...form, config: { ...form.config, chatPath: e.target.value } })}
-                placeholder="/v1/chat/completions" />
-              <span className="faint" style={{ fontSize: 11 }}>برای URL پایه بدون /v1، همین مقدار پیش‌فرض را نگه دارید.</span>
-            </div>
+            <Field label="مسیر Chat Completion" hint="اگر آدرس پایه شامل /v1 نیست، مقدار پیش‌فرض را نگه دارید.">
+              <input className="input mono" dir="ltr" value={form.config.chatPath ?? '/v1/chat/completions'}
+                placeholder="/v1/chat/completions" onChange={(e) => setCfg({ chatPath: e.target.value })} />
+            </Field>
           )}
 
           {form.kind === 'custom_http' && (
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 6 }}>
+            <SectionCard icon="code" title="پیکربندی HTTP سفارشی" subtitle="ساختار درخواست و پاسخ را دقیق تعیین کنید">
               <div className="grid grid-2">
-                <div className="field"><label>Endpoint</label>
-                  <input className="input" dir="ltr" value={form.config.endpoint ?? ''}
-                    onChange={(e) => setForm({ ...form, config: { ...form.config, endpoint: e.target.value } })}
-                    placeholder="/chat" /></div>
-                <div className="field"><label>نوع احراز هویت</label>
+                <Field label="Endpoint">
+                  <input className="input mono" dir="ltr" value={form.config.endpoint ?? ''} placeholder="/chat"
+                    onChange={(e) => setCfg({ endpoint: e.target.value })} />
+                </Field>
+                <Field label="نوع احراز هویت">
                   <select className="select" value={form.config.auth?.type ?? 'bearer'}
-                    onChange={(e) => setForm({ ...form, config: { ...form.config, auth: { ...form.config.auth, type: e.target.value } } })}>
-                    <option value="bearer">Bearer</option><option value="api_key_header">API Key Header</option>
-                    <option value="api_key_query">API Key Query</option><option value="basic">Basic</option>
-                    <option value="none">بدون احراز</option>
-                  </select></div>
+                    onChange={(e) => setAuth({ type: e.target.value })}>
+                    <option value="bearer">Bearer Token</option>
+                    <option value="api_key_header">کلید در هدر</option>
+                    <option value="api_key_query">کلید در Query String</option>
+                    <option value="basic">Basic Auth</option>
+                    <option value="none">بدون احراز هویت</option>
+                  </select>
+                </Field>
                 {form.config.auth?.type === 'api_key_header' && (
-                  <div className="field"><label>نام هدر</label>
-                    <input className="input" dir="ltr" value={form.config.auth?.headerName ?? ''}
-                      onChange={(e) => setForm({ ...form, config: { ...form.config, auth: { ...form.config.auth, headerName: e.target.value } } })}
-                      placeholder="x-api-key" /></div>
+                  <Field label="نام هدر">
+                    <input className="input mono" dir="ltr" value={form.config.auth?.headerName ?? ''}
+                      placeholder="x-api-key" onChange={(e) => setAuth({ headerName: e.target.value })} />
+                  </Field>
                 )}
-                <div className="field"><label>مسیر پاسخ (JSON Path)</label>
-                  <input className="input" dir="ltr" value={form.config.responsePath ?? ''}
-                    onChange={(e) => setForm({ ...form, config: { ...form.config, responsePath: e.target.value } })}
-                    placeholder="data.message.content" /></div>
+                <Field label="مسیر پاسخ (JSON Path)">
+                  <input className="input mono" dir="ltr" value={form.config.responsePath ?? ''}
+                    placeholder="data.message.content" onChange={(e) => setCfg({ responsePath: e.target.value })} />
+                </Field>
               </div>
-              <div className="field"><label>قالب بدنه‌ی درخواست (Request Template)</label>
+              <Field label="قالب بدنهٔ درخواست">
                 <textarea className="textarea mono" dir="ltr" rows={5} value={form.config.bodyTemplate ?? ''}
-                  onChange={(e) => setForm({ ...form, config: { ...form.config, bodyTemplate: e.target.value } })}
-                  placeholder={'{"model":"{{model}}","messages":{{messages}},"temperature":{{temperature}}}'} />
-                <span className="faint" style={{ fontSize: 11 }}>
-                  متغیرهای مجاز: api_key · model · messages · system_prompt · temperature · max_tokens · user_id · group_id · conversation_id · language
+                  placeholder={'{"model":"{{model}}","messages":{{messages}},"temperature":{{temperature}}}'}
+                  onChange={(e) => setCfg({ bodyTemplate: e.target.value })} />
+              </Field>
+              <Notice kind="info" title="متغیرهای قابل استفاده">
+                <span className="mono xs ltr">
+                  api_key · model · messages · system_prompt · temperature · max_tokens · user_id · group_id ·
+                  conversation_id · language
                 </span>
-              </div>
-            </div>
+              </Notice>
+            </SectionCard>
           )}
-
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={() => { setCreating(false); setEditingProvider(null); }}>{t('cancel')}</button>
-            <button className="btn primary" onClick={save} disabled={!form.slug || !form.display_name}>{t('save')}</button>
-          </div>
         </Modal>
       )}
 
       {keysFor && (
-        <Modal title={`کلیدهای ${keysFor.display_name}`} onClose={() => setKeysFor(null)}>
-          <div className="row">
-            <input className="input" dir="ltr" type="password" placeholder="sk-... یا کلید API"
-              value={newKey} onChange={(e) => setNewKey(e.target.value)} />
-            <button className="btn primary" onClick={addKey}>{t('add')}</button>
-          </div>
-          <div className="mt">
-            {keys.length === 0 && <div className="muted">هیچ کلیدی ثبت نشده است</div>}
-            {keys.map((k) => (
-              <div key={k.id} className="row" style={{ justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                <span className="mono">#{k.id} {k.label}</span>
-                <div className="row">
-                  <StatusBadge value={k.status} />
-                  <button className="btn sm" onClick={() => toggleKey(k)}>{k.status === 'active' ? 'غیرفعال' : 'فعال'}</button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="faint mt" style={{ fontSize: 12 }}>
-            کلیدها با AES-256-GCM رمزنگاری و فقط به‌صورت ماسک‌شده نمایش داده می‌شوند. چرخش خودکار: کم‌استفاده‌ترین کلید فعال بعدی است.
-          </p>
+        <Modal
+          icon="key"
+          title={`کلیدهای «${keysFor.display_name}»`}
+          onClose={() => setKeysFor(null)}
+          footer={<><div className="spacer" /><button className="btn" onClick={() => setKeysFor(null)}>{t('close')}</button></>}
+        >
+          <Field label="افزودن کلید جدید" hint="کلید پس از ذخیره دیگر قابل مشاهده نیست.">
+            <div className="row tight">
+              <input className="input mono" dir="ltr" type="password" placeholder="sk-… یا کلید API"
+                value={newKey} onChange={(e) => setNewKey(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addKey()} />
+              <button className="btn primary" onClick={addKey} disabled={!newKey.trim()}>
+                <Icon name="plus" size={14} />{t('add')}
+              </button>
+            </div>
+          </Field>
+
+          {keys.length === 0 ? (
+            <EmptyState icon="key" title="هیچ کلیدی ثبت نشده است"
+              text="برای فعال شدن این تأمین‌کننده حداقل یک کلید API لازم است." />
+          ) : (
+            <List bordered>
+              {keys.map((k) => (
+                <ListRow
+                  key={k.id}
+                  icon="key"
+                  title={k.label || `کلید #${k.id}`}
+                  subtitle={k.masked ? <span className="mono">{k.masked}</span> : `شناسه ${k.id}`}
+                  end={
+                    <>
+                      <StatusBadge value={k.status} />
+                      <button className="btn xs" onClick={() => toggleKey(k)}>
+                        {k.status === 'active' ? 'غیرفعال کن' : 'فعال کن'}
+                      </button>
+                    </>
+                  }
+                />
+              ))}
+            </List>
+          )}
+
+          <Notice kind="info" title="امنیت کلیدها">
+            کلیدها با AES-256-GCM رمزنگاری شده و فقط به‌صورت ماسک‌شده نمایش داده می‌شوند.
+            چرخش خودکار: کم‌استفاده‌ترین کلید فعال، انتخاب بعدی است.
+          </Notice>
         </Modal>
+      )}
+
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.title}
+          message={confirm.message}
+          confirmLabel="حذف کن"
+          onConfirm={confirm.run}
+          onClose={() => setConfirm(null)}
+        />
       )}
     </div>
   );

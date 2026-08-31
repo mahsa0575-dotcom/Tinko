@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { fmtNum, t } from '../lib/i18n.js';
-import { Modal } from '../components/ui.jsx';
+import {
+  Modal, ConfirmDialog, PageHeader, SectionCard, Field,
+  IconButton, EmptyState, Notice,
+} from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
 import { Icon } from '../components/icons.jsx';
+
+const PROFILES = {
+  fast: 'سریع', balanced: 'متعادل', smart: 'هوشمند', reasoning: 'استدلالی',
+  vision: 'تصویری', cheap: 'کم‌هزینه', premium: 'ممتاز', long_context: 'زمینهٔ بلند',
+};
 
 /** Personality Studio: config panel + prompt editor + live test chat. */
 export function PersonalitiesPage() {
@@ -18,6 +26,7 @@ export function PersonalitiesPage() {
   const [tg, setTg] = useState({ configured: false, masked: null, username: null });
   const [tokenInput, setTokenInput] = useState('');
   const [tgBusy, setTgBusy] = useState(false);
+  const [confirmRemoveToken, setConfirmRemoveToken] = useState(false);
   const logRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -42,10 +51,10 @@ export function PersonalitiesPage() {
   };
 
   const removeToken = async () => {
-    if (!window.confirm('توکن حذف شود؟ بات خاموش می‌شود (مگر اینکه توکن در .env باشد).')) return;
     try {
       await api('/settings/bot-token', { method: 'DELETE' });
       toast('توکن حذف شد', 'info');
+      setConfirmRemoveToken(false);
       setTg(await api('/settings/bot-token'));
     } catch (err) { toast(err.message, 'error'); }
   };
@@ -53,7 +62,7 @@ export function PersonalitiesPage() {
   const saveIdentity = async () => {
     try {
       setIdentity(await api('/settings/bot-identity', { method: 'PUT', body: identity }));
-      toast('نام ربات ذخیره شد — در گروه با «{name} خوبی؟» صدایت بزنید'.replace('{name}', identity.name), 'success');
+      toast(`نام ربات ذخیره شد — در گروه با «${identity.name} خوبی؟» صدایش بزنید`, 'success');
     } catch (err) { toast(err.message, 'error'); }
   };
 
@@ -77,6 +86,7 @@ export function PersonalitiesPage() {
       setChat([]);
     }).catch((err) => toast(err.message, 'error'));
   };
+  const setF = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   const save = async () => {
     try {
@@ -116,144 +126,218 @@ export function PersonalitiesPage() {
     } finally { setBusy(false); }
   };
 
+  const promptChars = (form?.system_prompt ?? '').length;
+
   return (
     <div className="page">
-      <div className="row">
-        <h1 className="page-title"><span className="title-icon"><Icon name="mask" size={20} /></span>{t('personalities')}</h1>
-        <div className="spacer" />
-        <button className="btn primary" onClick={startCreate}>+ {t('add')}</button>
-      </div>
-      <p className="page-subtitle">{rows ? `${fmtNum(rows.length)} personality` : t('loading')} — هر گروه می‌تواند شخصیت مستقل داشته باشد</p>
+      <PageHeader
+        icon="mask"
+        title={t('personalities')}
+        subtitle="هر گروه می‌تواند شخصیت مستقل خودش را داشته باشد — لحن، دانش و قواعد پاسخ‌دهی"
+        actions={(
+          <button className="btn primary sm" onClick={startCreate}>
+            <Icon name="plus" size={13} /> شخصیت جدید
+          </button>
+        )}
+      />
 
-      {/* Bot identity: the name users call in groups (spec §8) */}
-      {identity && (
-        <div className="card" style={{ marginBottom: 16, borderColor: 'var(--primary)' }}>
-          <div className="card-title"><Icon name="mask" size={14} /> هویت ربات — اسمی که در گروه صدایش می‌زنند</div>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
-            <div className="field" style={{ marginBottom: 0, width: 200 }}>
-              <label>نام ربات</label>
-              <input className="input" value={identity.name} onChange={(e) => setIdentity({ ...identity, name: e.target.value })} />
+      <div className="grid grid-2">
+        {/* Bot identity: the name users call in groups */}
+        {identity && (
+          <SectionCard
+            accent="primary"
+            icon="mask"
+            title="هویت ربات"
+            subtitle="نامی که کاربران در گروه با آن ربات را صدا می‌زنند"
+          >
+            <div className="col">
+              <Field label="نام ربات" required>
+                <input className="input" value={identity.name}
+                  onChange={(e) => setIdentity({ ...identity, name: e.target.value })} />
+              </Field>
+              <Field label="معرفی کوتاه" hint="اختیاری — در پاسخ‌های معرفی استفاده می‌شود.">
+                <input className="input" value={identity.bio ?? ''}
+                  onChange={(e) => setIdentity({ ...identity, bio: e.target.value })} />
+              </Field>
+              <Notice kind="info" icon="info">
+                پس از ذخیره، هر کسی در گروه بنویسد «{identity.name || 'نام ربات'} خوبی؟»
+                ربات مستقیماً با ریپلای به همان فرد پاسخ می‌دهد.
+              </Notice>
+              <div className="row">
+                <div className="spacer" />
+                <button className="btn primary" onClick={saveIdentity}
+                  disabled={!(identity.name ?? '').trim()}>
+                  <Icon name="save" size={13} /> {t('save')}
+                </button>
+              </div>
             </div>
-            <div className="field" style={{ marginBottom: 0, flex: 1, minWidth: 220 }}>
-              <label>بیو / معرفی کوتاه (اختیاری)</label>
-              <input className="input" value={identity.bio ?? ''} onChange={(e) => setIdentity({ ...identity, bio: e.target.value })} />
+          </SectionCard>
+        )}
+
+        {/* Telegram connection */}
+        <SectionCard
+          accent={tg.configured ? 'success' : 'warning'}
+          icon="globe"
+          title="اتصال تلگرام"
+          subtitle="توکن ربات را از @BotFather بگیرید"
+          actions={tg.configured
+            ? <span className="badge success"><span className="dot" /> @{tg.username ?? '؟'}</span>
+            : <span className="badge warning">تنظیم نشده</span>}
+        >
+          <div className="col">
+            {tg.configured && (
+              <Field label="توکن فعلی">
+                <input className="input mono" dir="ltr" readOnly value={tg.masked ?? '••••'} />
+              </Field>
+            )}
+            <Field
+              label={tg.configured ? 'توکن جدید' : 'توکن ربات'}
+              hint="ذخیره = تست واقعی با تلگرام + رمزنگاری AES-256. تغییر توکن حداکثر تا ۱۵ ثانیه روی ربات اعمال می‌شود."
+            >
+              <input className="input mono" dir="ltr" type="password"
+                placeholder="123456789:AAF3..." value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)} />
+            </Field>
+            <div className="row">
+              {tg.configured && (
+                <button className="btn danger" onClick={() => setConfirmRemoveToken(true)}>
+                  <Icon name="trash" size={13} /> حذف توکن
+                </button>
+              )}
+              <div className="spacer" />
+              <button className="btn primary" onClick={saveToken} disabled={tgBusy || !tokenInput.trim()}>
+                <Icon name={tg.configured ? 'refresh' : 'plug'} size={13} />
+                {tgBusy ? 'در حال بررسی…' : (tg.configured ? 'تغییر توکن' : 'اتصال ربات')}
+              </button>
             </div>
-            <button className="btn primary" onClick={saveIdentity} disabled={!(identity.name ?? '').trim()}><Icon name="save" size={13} /> ذخیره</button>
           </div>
-          <span className="faint mt" style={{ fontSize: 11, display: 'inline-block' }}>
-            بعد از ذخیره، هر کسی در گروه بنویسد «{identity.name} خوبی؟» ربات مستقیماً به همان فرد با ریپلای جواب می‌دهد.
-          </span>
+        </SectionCard>
+      </div>
+
+      {rows && rows.length === 0 ? (
+        <EmptyState
+          icon="mask"
+          title="هیچ شخصیتی ساخته نشده است"
+          text="با ساختن اولین شخصیت، لحن و رفتار ربات را تعیین کنید."
+          action={<button className="btn primary" onClick={startCreate}>
+            <Icon name="plus" size={14} /> ساخت شخصیت
+          </button>}
+        />
+      ) : (
+        <div className="grid grid-cards auto-cards">
+          {(rows ?? []).map((p) => (
+            <SectionCard
+              key={p.id}
+              className="hoverable"
+              icon="mask"
+              title={p.display_name}
+              subtitle={<span className="ltr">{p.slug} · نسخهٔ {fmtNum(p.current_version)}</span>}
+              actions={<IconButton icon="edit" title={t('edit')} onClick={() => startEdit(p)} />}
+              footer={(
+                <div className="row wrap tight">
+                  <span className="badge primary">پروفایل: {PROFILES[p.model_profile_key] ?? p.model_profile_key ?? 'متعادل'}</span>
+                  {p.is_default && <span className="badge success">پیش‌فرض</span>}
+                </div>
+              )}
+            >
+              <p className="muted sm clamp-2">{p.description || 'بدون توضیح'}</p>
+            </SectionCard>
+          ))}
         </div>
       )}
 
-      {/* Telegram connection: set/test the bot token from the panel */}
-      <div className="card" style={{ marginBottom: 16, borderColor: tg.configured ? 'var(--success)' : 'var(--warning)' }}>
-        <div className="card-title">
-          <Icon name="globe" size={14} /> اتصال تلگرام
-          {tg.configured
-            ? <span className="badge success">متصل: @{tg.username ?? '?'} ({tg.masked})</span>
-            : <span className="badge warning">تنظیم نشده</span>}
-        </div>
-        <div className="row" style={{ flexWrap: 'wrap' }}>
-          <input className="input" style={{ flex: 1, minWidth: 260 }} dir="ltr" type="password"
-            placeholder="123456789:AAF3..." value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)} />
-          <button className="btn primary" onClick={saveToken} disabled={tgBusy || !tokenInput.trim()}>
-            {tgBusy ? '…' : (tg.configured ? <><Icon name="refresh" size={13} />تغییر توکن</> : <><Icon name="plug" size={13} />اتصال بات</>)}
-          </button>
-          {tg.configured && <button className="btn danger" onClick={removeToken}><Icon name="trash" size={13} /> حذف</button>}
-        </div>
-        <span className="faint mt" style={{ fontSize: 11, display: 'inline-block' }}>
-          توکن را از @BotFather بگیرید. ذخیره = تست واقعی تلگرام + رمزنگاری AES-256. تغییر توکن تا ۱۵ ثانیه بعد خودکار روی بات اعمال می‌شود.
-          بعد از اتصال، در تلگرام باز بات پیام بدهید — چت خصوصی فعال است.
-        </span>
-      </div>
-
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-        {(rows ?? []).map((p) => (
-          <div key={p.id} className="card">
-            <div className="row">
-              <Icon name="mask" size={22} />
-              <div>
-                <div style={{ fontWeight: 700 }}>{p.display_name}</div>
-                <div className="faint mono" style={{ fontSize: 11 }}>{p.slug} · v{p.current_version}</div>
-              </div>
-              <div className="spacer" />
-              <button className="btn sm" onClick={() => startEdit(p)}><Icon name="edit" size={13} /></button>
-            </div>
-            <p className="muted mt" style={{ fontSize: 12, minHeight: 32 }}>{p.description || '—'}</p>
-            <div className="row" style={{ fontSize: 11 }}>
-              <span className="badge primary">پروفایل: {p.model_profile_key ?? 'balanced'}</span>
-              {p.is_default && <span className="badge success">پیش‌فرض</span>}
-            </div>
-          </div>
-        ))}
-        {rows && rows.length === 0 && (
-          <div className="card"><div className="empty">
-            <div className="empty-icon"><Icon name="mask" size={24} /></div>
-            <div className="empty-title">هیچ شخصیتی ساخته نشده است</div>
-            <button className="btn primary mt" onClick={startCreate}>+ ساخت شخصیت</button>
-          </div></div>
-        )}
-      </div>
-
       {editing && form && (
-        <Modal title={editing.id ? `${form.display_name}` : 'شخصیت جدید'} onClose={() => setEditing(null)} wide>
+        <Modal
+          title={editing.id ? form.display_name || 'ویرایش شخصیت' : 'شخصیت جدید'}
+          icon="mask"
+          onClose={() => setEditing(null)}
+          wide
+          footer={(
+            <>
+              <span className="faint xs">{fmtNum(promptChars)} نویسه در پرامپت</span>
+              <div className="spacer" />
+              <button className="btn" onClick={() => setEditing(null)}>{t('cancel')}</button>
+              <button className="btn primary" onClick={save}
+                disabled={!form.slug.trim() || !form.display_name.trim()}>
+                {editing.id ? t('save') : t('create')}
+              </button>
+            </>
+          )}
+        >
           <div className="studio">
-            {/* Left: configuration */}
-            <div>
-              <div className="field"><label>نامک (slug)</label>
-                <input className="input" dir="ltr" value={form.slug} disabled={Boolean(editing.id)}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value })} /></div>
-              <div className="field"><label>نام نمایشی</label>
-                <input className="input" value={form.display_name}
-                  onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></div>
-              <div className="field"><label>توضیح</label>
-                <input className="input" value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-              <div className="field"><label>پروفایل مدل</label>
-                <select className="select" value={form.model_profile_key}
-                  onChange={(e) => setForm({ ...form, model_profile_key: e.target.value })}>
-                  {['fast', 'balanced', 'smart', 'reasoning', 'vision', 'cheap', 'premium', 'long_context'].map((k) => (
-                    <option key={k} value={k}>{k}</option>
+            <div className="studio-main">
+              <div className="grid grid-2">
+                <Field label="نامک (slug)" required hint="شناسهٔ لاتین و بدون فاصله؛ بعد از ساخت قابل تغییر نیست.">
+                  <input className="input mono" dir="ltr" value={form.slug} disabled={Boolean(editing.id)}
+                    onChange={(e) => setF({ slug: e.target.value })} />
+                </Field>
+                <Field label="نام نمایشی" required>
+                  <input className="input" value={form.display_name}
+                    onChange={(e) => setF({ display_name: e.target.value })} />
+                </Field>
+                <Field label="توضیح کوتاه">
+                  <input className="input" value={form.description}
+                    onChange={(e) => setF({ description: e.target.value })} />
+                </Field>
+                <Field label="پروفایل مدل" hint="کیفیت و هزینهٔ پاسخ‌ها را تعیین می‌کند.">
+                  <select className="select" value={form.model_profile_key}
+                    onChange={(e) => setF({ model_profile_key: e.target.value })}>
+                    {Object.entries(PROFILES).map(([k, label]) => (
+                      <option key={k} value={k}>{label}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              <Field
+                label="پرامپت سیستم"
+                hint="هر ذخیره یک نسخهٔ جدید می‌سازد؛ می‌توانید بعداً به نسخه‌های پیشین برگردید."
+              >
+                <textarea className="textarea" rows={14} value={form.system_prompt}
+                  onChange={(e) => setF({ system_prompt: e.target.value })}
+                  placeholder="تو یک دستیار فارسی‌زبان هستی که…" />
+              </Field>
+            </div>
+
+            <div className="studio-side">
+              <div className="chat-panel">
+                <div className="card-title"><Icon name="activity" size={14} /> تست زندهٔ گفت‌وگو</div>
+                <div className="chat-log" ref={logRef}>
+                  {chat.length === 0 && (
+                    <span className="muted sm">پیامی بفرستید تا پاسخ این شخصیت را ببینید.</span>
+                  )}
+                  {chat.map((m, i) => (
+                    <div key={i} className={`bubble ${m.role}`}>{m.content}</div>
                   ))}
-                </select></div>
-            </div>
-
-            {/* Center: prompt editor */}
-            <div className="field">
-              <label>پرامپت سیستم (System Prompt) — نسخه‌بندی خودکار</label>
-              <textarea className="textarea" rows={14} value={form.system_prompt}
-                onChange={(e) => setForm({ ...form, system_prompt: e.target.value })}
-                placeholder="تو یک دستیار فارسی‌زبان هستی که…" />
-              <span className="faint" style={{ fontSize: 11 }}>
-                هر ذخیره یک نسخه‌ی جدید ایجاد می‌کند؛ می‌توانید بعداً به نسخه‌های قبلی برگردید.
-              </span>
-            </div>
-
-            {/* Right: live test chat */}
-            <div className="card chat-panel">
-              <div className="card-title"><Icon name="activity" size={14} /> تست زنده</div>
-              <div className="chat-log" ref={logRef}>
-                {chat.length === 0 && <div className="muted" style={{ fontSize: 12 }}>پیامی بفرستید تا پاسخ این شخصیت را ببینید.</div>}
-                {chat.map((m, i) => (
-                  <div key={i} className={`bubble ${m.role}`}>{m.content}</div>
-                ))}
-                {busy && <div className="bubble bot">…</div>}
+                  {busy && <div className="bubble bot">در حال نوشتن…</div>}
+                </div>
+                <div className="chat-input-row">
+                  <input className="input" placeholder="مثلاً: تو کی هستی؟" value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendTest()} />
+                  <button className="btn primary" onClick={sendTest} disabled={busy || !chatInput.trim()}>
+                    <Icon name="send" size={14} />
+                  </button>
+                </div>
               </div>
-              <div className="chat-input-row">
-                <input className="input" placeholder="مثلاً: تو کی هستی؟" value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && sendTest()} />
-                <button className="btn primary" onClick={sendTest} disabled={busy}><Icon name="send" size={14} /></button>
-              </div>
+              {chat.length > 0 && (
+                <button className="btn ghost sm block" onClick={() => setChat([])}>
+                  <Icon name="trash" size={13} /> پاک کردن گفت‌وگو
+                </button>
+              )}
             </div>
-          </div>
-          <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-            <button className="btn" onClick={() => setEditing(null)}>{t('cancel')}</button>
-            <button className="btn primary" onClick={save} disabled={!form.slug || !form.display_name}>{t('save')}</button>
           </div>
         </Modal>
+      )}
+
+      {confirmRemoveToken && (
+        <ConfirmDialog
+          title="حذف توکن تلگرام"
+          message="با حذف توکن، ربات خاموش می‌شود (مگر اینکه توکن در فایل .env تنظیم شده باشد). ادامه می‌دهید؟"
+          confirmLabel="حذف کن"
+          onConfirm={removeToken}
+          onClose={() => setConfirmRemoveToken(false)}
+        />
       )}
     </div>
   );

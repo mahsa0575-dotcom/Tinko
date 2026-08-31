@@ -1,11 +1,36 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { fmtNum, fmtTime, t } from '../lib/i18n.js';
-import { DataTable, StatusBadge, Modal } from '../components/ui.jsx';
+import {
+  DataTable, StatusBadge, Modal, ConfirmDialog, PageHeader, SectionCard,
+  Toolbar, SearchInput, Field, Checkbox, IconButton, CodeBlock, Notice, Avatar,
+} from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
 import { Icon } from '../components/icons.jsx';
 
-const RESPONSE_MODES = ['mention', 'reply', 'mention_reply', 'command', 'always', 'smart', 'conversation', 'admin_only', 'silent'];
+const RESPONSE_MODES = {
+  mention: 'فقط با منشن',
+  reply: 'فقط با ریپلای',
+  mention_reply: 'منشن یا ریپلای',
+  command: 'فقط با دستور',
+  always: 'به همه‌ی پیام‌ها',
+  smart: 'هوشمند',
+  conversation: 'حالت گفت‌وگو',
+  admin_only: 'فقط مدیران',
+  silent: 'خاموش',
+};
+const MODERATION_POLICIES = { off: 'خاموش', relaxed: 'آسان‌گیر', balanced: 'متعادل', strict: 'سخت‌گیر' };
+const MEMORY_POLICIES = { off: 'خاموش', conservative: 'محافظه‌کار', standard: 'استاندارد', aggressive: 'پرجزئیات' };
+const GROUP_TYPE = { group: 'گروه', supergroup: 'سوپرگروه', channel: 'کانال', private: 'خصوصی' };
+
+const BULK_ACTIONS = [
+  { key: 'set_personality', label: 'تعیین شخصیت', needsValue: true, valueHint: 'شناسهٔ شخصیت' },
+  { key: 'set_model_profile', label: 'تعیین پروفایل مدل', needsValue: true, valueHint: 'کلید پروفایل' },
+  { key: 'set_moderation', label: 'تعیین سیاست مدیریت محتوا', needsValue: true, valueHint: 'off / relaxed / balanced / strict' },
+  { key: 'enable_ai', label: 'فعال‌سازی هوش مصنوعی' },
+  { key: 'disable_ai', label: 'غیرفعال‌سازی هوش مصنوعی' },
+  { key: 'blacklist', label: 'مسدودسازی گروه‌ها', danger: true },
+];
 
 export function GroupsPage() {
   const { toast } = useStore();
@@ -16,6 +41,7 @@ export function GroupsPage() {
   const [selected, setSelected] = useState(new Set());
   const [bulkAction, setBulkAction] = useState('');
   const [bulkValue, setBulkValue] = useState('');
+  const [bulkConfirm, setBulkConfirm] = useState(false);
   const [debug, setDebug] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [templateKey, setTemplateKey] = useState('');
@@ -33,6 +59,7 @@ export function GroupsPage() {
     try {
       const detail = await api(`/groups/${group.id}`);
       setEditing(group);
+      setTemplateKey(''); setTemplatePreview(null);
       setSettings({
         response_mode: detail.response_mode ?? 'mention_reply',
         model_profile_key: detail.model_profile_key ?? 'balanced',
@@ -43,12 +70,15 @@ export function GroupsPage() {
       });
     } catch (err) { toast(err.message, 'error'); }
   };
+  const set = (patch) => setSettings((s) => ({ ...s, ...patch }));
+
+  const closeEditor = () => { setEditing(null); setSettings(null); setTemplatePreview(null); setTemplateKey(''); };
 
   const saveSettings = async () => {
     try {
       await api(`/groups/${editing.id}/settings`, { method: 'PATCH', body: settings });
       toast(t('saved'), 'success');
-      setEditing(null);
+      closeEditor();
       load();
     } catch (err) { toast(err.message, 'error'); }
   };
@@ -61,22 +91,32 @@ export function GroupsPage() {
   // ---- bulk operations ----
   const toggle = (id) => setSelected((prev) => {
     const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
+    if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const runBulk = async () => {
-    if (!bulkAction || selected.size === 0) return;
-    if (bulkAction === 'blacklist' && !window.confirm(`مسدودسازی ${selected.size} گروه؟`)) return;
+  const allSelected = useMemo(
+    () => !!rows?.length && rows.every((g) => selected.has(g.id)),
+    [rows, selected],
+  );
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set((rows ?? []).map((g) => g.id)));
+
+  const activeBulk = BULK_ACTIONS.find((a) => a.key === bulkAction);
+
+  const doBulk = async () => {
     try {
-      const valueNeeds = ['set_personality', 'set_model_profile', 'set_moderation'].includes(bulkAction);
       const result = await api('/groups/bulk', {
         method: 'POST',
-        body: { ids: [...selected], action: bulkAction, value: valueNeeds ? bulkValue : undefined },
+        body: { ids: [...selected], action: bulkAction, value: activeBulk?.needsValue ? bulkValue : undefined },
       });
-      toast(`${t('saved')} — ${fmtNum(result.affected)} گروه`, 'success');
+      toast(`انجام شد — ${fmtNum(result.affected)} گروه به‌روزرسانی شد`, 'success');
       setSelected(new Set()); setBulkAction(''); setBulkValue('');
       load();
     } catch (err) { toast(err.message, 'error'); }
+  };
+  const runBulk = () => {
+    if (!bulkAction || selected.size === 0) return;
+    if (activeBulk?.danger) { setBulkConfirm(true); return; }
+    doBulk();
   };
 
   const previewTemplate = async () => {
@@ -91,140 +131,233 @@ export function GroupsPage() {
     if (!editing || !templateKey) return;
     try {
       await api(`/groups/${editing.id}/apply-template`, { method: 'POST', body: { key: templateKey } });
-      toast('قالب اعمال شد', 'success');
-      setTemplatePreview(null); setEditing(null);
+      toast('قالب با موفقیت اعمال شد', 'success');
+      closeEditor();
       load();
     } catch (err) { toast(err.message, 'error'); }
   };
 
   return (
     <div className="page">
-      <h1 className="page-title"><span className="title-icon"><Icon name="users" size={20} /></span>{t('groups')}</h1>
-      <p className="page-subtitle">{rows ? `${fmtNum(rows.length)} group(s)` : t('loading')}</p>
-      <div className="row" style={{ marginBottom: 14 }}>
-        <input className="input" style={{ maxWidth: 280 }} placeholder={t('search')}
-          value={search} onChange={(e) => setSearch(e.target.value)} />
-        <div className="spacer" />
-        <button className="btn" onClick={load}><Icon name="refresh" size={14} /> {t('refresh')}</button>
-      </div>
+      <PageHeader
+        icon="users"
+        title={t('groups')}
+        subtitle="گروه‌ها و کانال‌هایی که ربات در آن‌ها عضو است — تنظیمات هر گروه مستقل است"
+        actions={(
+          <button className="btn sm" onClick={load}>
+            <Icon name="refresh" size={13} /> {t('refresh')}
+          </button>
+        )}
+      />
 
-      {/* Bulk operations bar (spec §193) */}
+      <Toolbar>
+        <SearchInput value={search} onChange={setSearch} placeholder={t('search')} onEnter={load} />
+        <div className="spacer" />
+        {rows && <span className="faint sm">{fmtNum(rows.length)} گروه</span>}
+      </Toolbar>
+
       {selected.size > 0 && (
-        <div className="card row" style={{ marginBottom: 14, borderColor: 'var(--primary)' }}>
-          <span className="badge primary">{fmtNum(selected.size)} انتخاب‌شده</span>
-          <select className="select" style={{ width: 210 }} value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
-            <option value="">عملیات گروهی…</option>
-            <option value="set_personality">تعیین شخصیت (ID)</option>
-            <option value="set_model_profile">تعیین پروفایل مدل</option>
-            <option value="set_moderation">تعیین سیاست مدریشن</option>
-            <option value="enable_ai">فعال‌سازی AI</option>
-            <option value="disable_ai">غیرفعال‌سازی AI</option>
-            <option value="blacklist">مسدودسازی گروه‌ها</option>
-          </select>
-          {['set_personality', 'set_model_profile', 'set_moderation'].includes(bulkAction) && (
-            <input className="input" style={{ width: 160 }} placeholder="مقدار" dir="ltr"
-              value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} />
-          )}
-          <button className="btn primary" onClick={runBulk} disabled={!bulkAction}>اجرای گروهی</button>
-          <button className="btn ghost" onClick={() => setSelected(new Set())}>لغو انتخاب</button>
-        </div>
+        <SectionCard accent="primary" flat>
+          <div className="row wrap">
+            <span className="badge primary">
+              <span className="dot" /> {fmtNum(selected.size)} گروه انتخاب شد
+            </span>
+            <select className="select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+              <option value="">یک عملیات گروهی انتخاب کنید…</option>
+              {BULK_ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+            </select>
+            {activeBulk?.needsValue && (
+              <input className="input" dir="ltr" placeholder={activeBulk.valueHint}
+                value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} />
+            )}
+            <div className="spacer" />
+            <button className={`btn ${activeBulk?.danger ? 'danger solid' : 'primary'}`}
+              onClick={runBulk} disabled={!bulkAction || (activeBulk?.needsValue && !bulkValue.trim())}>
+              <Icon name="check" size={14} /> اجرا
+            </button>
+            <button className="btn ghost" onClick={() => setSelected(new Set())}>لغو انتخاب</button>
+          </div>
+        </SectionCard>
       )}
 
-      <DataTable loading={!rows} rows={rows} emptyText="هیچ گروهی ثبت نشده است — ربات را به گروه اضافه کنید"
+      <DataTable
+        loading={!rows} rows={rows}
+        emptyIcon="users"
+        emptyText="هیچ گروهی ثبت نشده است — ربات را به یک گروه اضافه کنید"
         columns={[
-          { key: '_select', label: '', sortable: false, render: (g) => (
-            <input type="checkbox" checked={selected.has(g.id)} onChange={() => toggle(g.id)} />
-          )},
-          { key: 'title', label: 'Title', render: (g) => (
-            <div>
-              <div style={{ fontWeight: 600 }}>{g.title ?? '—'}</div>
-              {g.username && <div className="faint mono" style={{ fontSize: 11 }}>@{g.username}</div>}
-            </div>
-          )},
-          { key: 'type', label: 'Type' },
+          {
+            key: '_select', sortable: false, width: '40px',
+            label: <Checkbox checked={allSelected} indeterminate={selected.size > 0 && !allSelected}
+              onChange={toggleAll} title={t('select_all')} />,
+            render: (g) => <Checkbox checked={selected.has(g.id)} onChange={() => toggle(g.id)} />,
+          },
+          {
+            key: 'title', label: t('col_title'),
+            render: (g) => (
+              <div className="row tight">
+                <Avatar name={g.title ?? String(g.id)} />
+                <div className="col tight">
+                  <span className="cell-strong">{g.title ?? '—'}</span>
+                  {g.username && <span className="faint xs ltr">@{g.username}</span>}
+                </div>
+              </div>
+            ),
+          },
+          {
+            key: 'type', label: t('col_type'),
+            render: (g) => <span className="badge neutral">{GROUP_TYPE[g.type] ?? g.type ?? '—'}</span>,
+          },
           { key: 'status', label: t('status'), render: (g) => <StatusBadge value={g.status} /> },
-          { key: 'ai_enabled', label: 'AI', render: (g) => <StatusBadge value={g.ai_enabled === false ? 'disabled' : 'active'} /> },
-          { key: 'response_mode', label: 'Response mode' },
-          { key: 'last_activity', label: 'Last activity', render: (g) => fmtTime(g.last_activity) },
-          { key: 'actions', label: t('actions'), sortable: false, render: (g) => (
-            <div className="row">
-              <button className="btn sm" onClick={() => openSettings(g)}><Icon name="settings" size={13} /></button>
-              <button className="btn sm" title="دیباگر پیکربندی" onClick={() => openDebug(g)}><Icon name="search" size={13} /></button>
-            </div>
-          )},
+          {
+            key: 'ai_enabled', label: 'هوش مصنوعی',
+            render: (g) => <StatusBadge value={g.ai_enabled === false ? 'disabled' : 'active'} />,
+          },
+          {
+            key: 'response_mode', label: t('col_response_mode'),
+            render: (g) => <span className="muted sm">{RESPONSE_MODES[g.response_mode] ?? g.response_mode ?? '—'}</span>,
+          },
+          {
+            key: 'last_activity', label: t('col_last_activity'),
+            render: (g) => <span className="muted sm ltr">{fmtTime(g.last_activity)}</span>,
+          },
+          {
+            key: 'actions', label: t('actions'), sortable: false, cellClass: 'actions-cell',
+            render: (g) => (
+              <>
+                <IconButton icon="settings" title="تنظیمات گروه" onClick={() => openSettings(g)} />
+                <IconButton icon="search" title="دیباگر پیکربندی" onClick={() => openDebug(g)} />
+              </>
+            ),
+          },
         ]}
       />
 
       {editing && settings && (
-        <Modal title={`${editing.title ?? editing.id}`} onClose={() => { setEditing(null); setTemplatePreview(null); }}>
-          <div className="grid grid-2">
-            <div className="field"><label>AI</label>
-              <select className="select" value={String(settings.ai_enabled)}
-                onChange={(e) => setSettings({ ...settings, ai_enabled: e.target.value === 'true' })}>
-                <option value="true">فعال</option><option value="false">غیرفعال</option>
-              </select></div>
-            <div className="field"><label>حالت پاسخ</label>
-              <select className="select" value={settings.response_mode}
-                onChange={(e) => setSettings({ ...settings, response_mode: e.target.value })}>
-                {RESPONSE_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select></div>
-            <div className="field"><label>پروفایل مدل</label>
-              <input className="input" value={settings.model_profile_key}
-                onChange={(e) => setSettings({ ...settings, model_profile_key: e.target.value })} /></div>
-            <div className="field"><label>سیاست مدریشن</label>
-              <select className="select" value={settings.moderation_policy}
-                onChange={(e) => setSettings({ ...settings, moderation_policy: e.target.value })}>
-                {['off', 'relaxed', 'balanced', 'strict'].map((m) => <option key={m} value={m}>{m}</option>)}
-              </select></div>
-            <div className="field"><label>حافظه</label>
-              <select className="select" value={settings.memory_policy}
-                onChange={(e) => setSettings({ ...settings, memory_policy: e.target.value })}>
-                {['off', 'conservative', 'standard', 'aggressive'].map((m) => <option key={m} value={m}>{m}</option>)}
-              </select></div>
-            <div className="field"><label>تعداد پیام کانتکست</label>
-              <input className="input" type="number" min="2" max="50" value={settings.context_messages}
-                onChange={(e) => setSettings({ ...settings, context_messages: Number(e.target.value) })} /></div>
-          </div>
+        <Modal
+          title={editing.title ?? `گروه ${editing.id}`}
+          icon="users"
+          onClose={closeEditor}
+          footer={(
+            <>
+              <div className="spacer" />
+              <button className="btn" onClick={closeEditor}>{t('cancel')}</button>
+              <button className="btn primary" onClick={saveSettings}>{t('save')}</button>
+            </>
+          )}
+        >
+          <div className="col">
+            <div className="grid grid-2">
+              <Field label="هوش مصنوعی" hint="با خاموش کردن، ربات در این گروه پاسخ نمی‌دهد.">
+                <div className="segmented">
+                  <button className={settings.ai_enabled ? 'active' : ''}
+                    onClick={() => set({ ai_enabled: true })}>فعال</button>
+                  <button className={!settings.ai_enabled ? 'active' : ''}
+                    onClick={() => set({ ai_enabled: false })}>غیرفعال</button>
+                </div>
+              </Field>
 
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 6 }}>
-            <div className="field"><label>قالب آماده (spec §139–140)</label>
-              <div className="row">
-                <select className="select" value={templateKey} onChange={(e) => setTemplateKey(e.target.value)}>
-                  <option value="">انتخاب قالب…</option>
-                  {templates.map((tpl) => <option key={tpl.key} value={tpl.key}>{tpl.name}{tpl.builtin ? ' (داخلی)' : ''}</option>)}
+              <Field label="حالت پاسخ‌دهی">
+                <select className="select" value={settings.response_mode}
+                  onChange={(e) => set({ response_mode: e.target.value })}>
+                  {Object.entries(RESPONSE_MODES).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                 </select>
-                <button className="btn" onClick={previewTemplate} disabled={!templateKey}>پیش‌نمایش</button>
-                <button className="btn primary" onClick={applyTemplate} disabled={!templateKey}>اعمال</button>
-              </div>
-              {templatePreview && (
-                <pre className="mono mt" style={{ background: 'var(--surface-3)', padding: 10, borderRadius: 8, direction: 'ltr', fontSize: 11 }}>
-                  {JSON.stringify(templatePreview.preview, null, 2)}
-                </pre>
-              )}
-            </div>
-          </div>
+              </Field>
 
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={() => setEditing(null)}>{t('cancel')}</button>
-            <button className="btn primary" onClick={saveSettings}>{t('save')}</button>
+              <Field label="پروفایل مدل" hint="کلید پروفایلی که در صفحهٔ مدل‌ها تعریف شده است.">
+                <input className="input mono" dir="ltr" value={settings.model_profile_key}
+                  onChange={(e) => set({ model_profile_key: e.target.value })} />
+              </Field>
+
+              <Field label="تعداد پیام‌های زمینه" hint="چند پیام قبلی به مدل داده شود (۲ تا ۵۰).">
+                <input className="input" type="number" min="2" max="50" value={settings.context_messages}
+                  onChange={(e) => set({ context_messages: Number(e.target.value) })} />
+              </Field>
+
+              <Field label="سیاست مدیریت محتوا">
+                <select className="select" value={settings.moderation_policy}
+                  onChange={(e) => set({ moderation_policy: e.target.value })}>
+                  {Object.entries(MODERATION_POLICIES).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                </select>
+              </Field>
+
+              <Field label="سیاست حافظه">
+                <select className="select" value={settings.memory_policy}
+                  onChange={(e) => set({ memory_policy: e.target.value })}>
+                  {Object.entries(MEMORY_POLICIES).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            <SectionCard
+              icon="layers"
+              title="قالب آماده"
+              subtitle="یک پیکربندی از پیش‌آماده را روی این گروه اعمال کنید"
+            >
+              <div className="row wrap">
+                <select className="select" value={templateKey} onChange={(e) => { setTemplateKey(e.target.value); setTemplatePreview(null); }}>
+                  <option value="">انتخاب قالب…</option>
+                  {templates.map((tpl) => (
+                    <option key={tpl.key} value={tpl.key}>{tpl.name}{tpl.builtin ? ' (داخلی)' : ''}</option>
+                  ))}
+                </select>
+                <div className="spacer" />
+                <button className="btn" onClick={previewTemplate} disabled={!templateKey}>
+                  <Icon name="eye" size={13} /> پیش‌نمایش
+                </button>
+                <button className="btn primary" onClick={applyTemplate} disabled={!templateKey}>
+                  {t('apply')}
+                </button>
+              </div>
+
+              {templatePreview && (
+                <div className="mt">
+                  <Notice kind="info" title="این مقادیر جایگزین تنظیمات فعلی می‌شوند">
+                    پیش از اعمال، تغییرات را بررسی کنید.
+                  </Notice>
+                  <CodeBlock title="پیش‌نمایش قالب" copyable compact>
+                    {JSON.stringify(templatePreview.preview, null, 2)}
+                  </CodeBlock>
+                </div>
+              )}
+            </SectionCard>
           </div>
         </Modal>
       )}
 
       {debug && (
-        <Modal title={`دیباگر پیکربندی — ${debug.group.title ?? debug.group.id}`} onClose={() => setDebug(null)} wide>
-          {debug.resolution.map((layer, i) => (
-            <div key={i} className="card" style={{ marginBottom: 10, padding: 12 }}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <span className="badge primary">{layer.layer}</span>
-                <span className="faint" style={{ fontSize: 11 }}>{layer.source}</span>
-              </div>
-              <pre className="mono mt" style={{ fontSize: 11, direction: 'ltr', whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(layer.values, null, 2)}
-              </pre>
-            </div>
-          ))}
+        <Modal
+          title={`دیباگر پیکربندی — ${debug.group.title ?? debug.group.id}`}
+          icon="search"
+          onClose={() => setDebug(null)}
+          wide
+        >
+          <div className="col">
+            <Notice kind="info" title="ترتیب لایه‌ها">
+              مقادیر از بالا به پایین روی هم نوشته می‌شوند؛ آخرین لایه بالاترین اولویت را دارد.
+            </Notice>
+            {debug.resolution.map((layer, i) => (
+              <SectionCard
+                key={i}
+                icon="layers"
+                title={layer.layer}
+                subtitle={`منبع: ${layer.source}`}
+                actions={<span className="badge neutral">لایهٔ {fmtNum(i + 1)}</span>}
+              >
+                <CodeBlock copyable compact>{JSON.stringify(layer.values, null, 2)}</CodeBlock>
+              </SectionCard>
+            ))}
+          </div>
         </Modal>
+      )}
+
+      {bulkConfirm && (
+        <ConfirmDialog
+          title="مسدودسازی گروه‌ها"
+          message={`آیا مطمئن هستید که می‌خواهید ${fmtNum(selected.size)} گروه را مسدود کنید؟ ربات در این گروه‌ها دیگر فعال نخواهد بود.`}
+          confirmLabel="مسدود کن"
+          onConfirm={() => { setBulkConfirm(false); doBulk(); }}
+          onClose={() => setBulkConfirm(false)}
+        />
       )}
     </div>
   );

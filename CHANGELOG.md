@@ -1,5 +1,31 @@
 # Changelog
 
+## [Unreleased] — بازنویسی کامل دیزاین پنل مدیریت
+
+### سیستم طراحی از پایه
+- `_tokens.scss`: افزودن مقیاس‌های کامل فاصله (`--sp-0..10`)، شعاع (`--r-xs..full`)، تایپوگرافی (`--fs-2xs..4xl`, `--fw-*`, `--lh-*`)، نردبان z-index، سایه (`--shadow-1..4`) و حرکت؛ پالت تیره و روشن بازنویسی شد
+- `base.scss`: ریست، مقیاس تیترها، ابزارهای چیدمان (`.row/.col/.grid*`) و متن، `.page-head`، ۷ کی‌فریم، `.skeleton`، بلوک‌های دسترسی‌پذیری (`prefers-reduced-motion`, `prefers-reduced-transparency`, `@media print`)
+- `components.scss`: بازنویسی کامل همهٔ کامپوننت‌ها؛ دکمه‌های مبتنی بر CSS variable، چک‌باکس و اسلایدر استایل‌دار، `.studio` اصلاح شد (`minmax(0,1fr) minmax(0,300px)`)، مودال‌ها زیر ۶۴۰px تبدیل به bottom-sheet
+- `layout.scss`: `.shell-main`، ریل آیکونی سایدبار در ۱۱۸۰px، کشوی موبایل در ۷۸۰px با `.sidebar-scrim` — برای اولین بار پنل روی موبایل قابل استفاده شد
+- RTL-first: استفاده از `inset-inline-*`, `border-inline-*`, `padding-inline-*` به‌جای left/right
+
+### کامپوننت‌های مشترک
+- `ui.jsx`: ۲۸ کامپوننت — افزودن `SectionCard`, `Toolbar`, `SearchInput`, `Field`, `Toggle`, `Checkbox`, `Slider`, `Tabs`, `IconButton`, `List`, `ListRow`, `KV`, `CodeBlock`, `Notice`, `EmptyState`, `Avatar`, `SeverityBadge`, `Pulse`, `LoadingBlock`
+- `icons.jsx`: ۲۵ آیکون جدید
+- `i18n.js`: ~۴۰ کلید جدید (`col_*` و عمومی) در هر دو دیکشنری فارسی و انگلیسی
+
+### بازنویسی صفحات
+- همهٔ ۱۳ صفحه از `PageHeader` استفاده می‌کنند (پیش‌تر فقط ۲ صفحه)
+- حذف کامل `window.confirm()` — جایگزینی با `ConfirmDialog` در Providers، Users، Groups، Personalities، Security، Memory
+- حذف `<pre>`های استایل‌درون‌خطی — جایگزینی با `CodeBlock` دارای دکمهٔ کپی
+- حذف مودال دست‌ساز صفحهٔ VPS و جایگزینی با `<Modal>`
+- تب‌های تقلبی (`btn sm primary`) در Analytics و Moderation با کامپوننت واقعی `Tabs` جایگزین شد
+- ~۲۵ برچسب ستون انگلیسی در پنل فارسی، فارسی‌سازی شد
+- حذف ارجاع‌های داخلی مشخصات (`spec §71`, `spec §139–140`) از متن‌های کاربرپسند
+- Dashboard: `ResourceGauge` جدید — رفع نمایش شکستهٔ «در دسترس نیست» در `MetricCard`
+- Security: افزودن دکمهٔ افزودن خودکار otpauth (کلید مخفی به سرور ثالث فرستاده نمی‌شود)
+- Login: افزودن دکمهٔ نمایش/پنهان‌سازی گذرواژه
+
 ## 0.4.0 — `tinko` VPS CLI + rename to تینکو
 
 ### The `tinko` management CLI (`tinko` script, install via symlink)

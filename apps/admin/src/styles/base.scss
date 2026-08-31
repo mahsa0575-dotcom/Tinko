@@ -1,123 +1,479 @@
-@use 'tokens';
+/* ============================================================================
+   Tinko Admin — Base: reset, typography, primitives, utilities
+   ========================================================================== */
 
-* { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
-html, body, #root { height: 100%; }
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
 
 body {
-  margin: 0;
-  font-family: Vazirmatn, 'Segoe UI', Tahoma, system-ui, -apple-system, sans-serif;
-  font-size: 13.5px;
-  line-height: 1.65;
-  background: var(--bg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-normal);
+  line-height: var(--lh-snug);
   color: var(--text);
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: tabular-nums;
+  overflow-x: hidden;
 }
 
-// Aurora backdrop. PERF: a single fixed layer instead of two. The faint grid
-// used to be a second full-viewport `mask-image` layer, which forces the
-// compositor to keep an extra screen-sized texture alive on every scroll and
-// theme change. It is now folded into the same gradient stack and bounded to
-// the top strip where it is actually visible — no mask, no extra layer.
+/* One bounded ambient wash instead of multiple fixed blurred layers. */
 body::before {
   content: '';
-  position: fixed; inset: 0 0 auto; height: 560px; z-index: -1;
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--border) 42%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--border) 42%, transparent) 1px, transparent 1px),
-    var(--bg-glow);
-  background-size: 44px 44px, 44px 44px, auto, auto;
-  // Fades the grid out downwards without a separate masked element.
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+  position: fixed;
+  inset: 0;
+  z-index: -1;
   pointer-events: none;
+  background:
+    radial-gradient(900px 620px at 88% -8%, var(--primary-soft), transparent 62%),
+    radial-gradient(760px 520px at 4% 102%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%);
 }
 
-::selection { background: color-mix(in srgb, var(--primary) 32%, transparent); }
+/* ---- Focus ---------------------------------------------------------------- */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
 
-::-webkit-scrollbar { width: 9px; height: 9px; }
+/* ---- Scrollbars ----------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
-  background: var(--border-strong); border-radius: 99px;
-  border: 2px solid transparent; background-clip: padding-box;
-  &:hover { background-color: var(--text-faint); }
+  background: var(--scrollbar);
+  border-radius: var(--r-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
-::-webkit-scrollbar-track { background: transparent; }
-* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+  background-clip: content-box;
+}
 
-h1, h2, h3, h4 { margin: 0; font-weight: 800; letter-spacing: -.01em; }
-a { color: var(--primary); text-decoration: none; }
-a:hover { color: var(--primary-hover); }
-code {
-  background: var(--surface-3); padding: 1px 6px; border-radius: 6px;
-  font-size: 12px; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  direction: ltr; unicode-bidi: embed;
+/* ---- Selection ------------------------------------------------------------ */
+::selection {
+  background: var(--primary-soft-2);
+  color: var(--text);
 }
+
+/* ---- Typography ----------------------------------------------------------- */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+}
+h1 {
+  font-size: var(--fs-2xl);
+}
+h2 {
+  font-size: var(--fs-xl);
+}
+h3 {
+  font-size: var(--fs-lg);
+}
+h4 {
+  font-size: var(--fs-md);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color var(--t-fast) var(--ease);
+}
+a:hover {
+  color: var(--primary-hover);
+}
+
+code,
+kbd,
+pre,
+.mono,
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
 kbd {
-  font-family: ui-monospace, monospace; font-size: 10px;
-  background: var(--surface-3); border: 1px solid var(--border);
-  border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px;
+  display: inline-flex;
+  align-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  justify-content: center;
+  font-size: var(--fs-2xs);
+  border-radius: var(--r-xs);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  color: var(--text-muted);
 }
-button { font-family: inherit; }
-input, select, textarea { font-family: inherit; }
 
-.num { font-variant-numeric: tabular-nums; }
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+svg {
+  flex-shrink: 0;
+}
+ul,
+ol {
+  list-style: none;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
 
-.page { padding: 28px clamp(16px, 3vw, 32px) 44px; max-width: 1560px; margin: 0 auto; animation: page-in var(--t-med) var(--ease) both; }
-@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* ============================================================================
+   Layout utilities
+   ========================================================================== */
+.page {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding: clamp(16px, 2.6vw, 30px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  animation: page-in var(--t-slow) var(--ease-out) both;
+}
 
-.page-title {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 4px; font-size: 22px; font-weight: 800;
-  .title-icon {
-    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--primary-soft); color: var(--primary);
-    border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
-.page-subtitle { color: var(--text-muted); margin: 0 0 26px; font-size: 13px; }
 
-.grid { display: grid; gap: 16px; }
-// `auto-fill` + a min track never overflows, so no per-breakpoint overrides needed.
-.grid-cards { grid-template-columns: repeat(auto-fill, minmax(min(215px, 100%), 1fr)); }
-.auto-cards { grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
-.grid-2 { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
-
-.row { display: flex; align-items: center; gap: 10px; }
-.row.wrap { flex-wrap: wrap; }
-.spacer { flex: 1; }
-.muted { color: var(--text-muted); }
-.faint { color: var(--text-faint); }
-.mono { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 12px; }
-.mt { margin-top: 16px; }
-
-.section-title {
-  display: flex; align-items: center; gap: 9px;
-  font-size: 17px; margin: 30px 0 14px;
-  svg { color: var(--primary); }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.row.wrap {
+  flex-wrap: wrap;
+}
+.row.top {
+  align-items: flex-start;
+}
+.row.tight {
+  gap: var(--sp-2);
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.col.tight {
+  gap: var(--sp-2);
+}
+.spacer {
+  flex: 1;
+  min-width: 0;
 }
 
-// Focus visibility & reduced motion (accessibility)
-:focus-visible { outline: none; box-shadow: var(--ring); border-radius: 8px; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.grid {
+  display: grid;
+  gap: var(--sp-4);
+}
+.grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+}
+.grid-3 {
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+}
+.grid-cards,
+.auto-cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+}
+
+.mt {
+  margin-top: var(--sp-3);
+}
+.mt-lg {
+  margin-top: var(--sp-5);
+}
+.mb {
+  margin-bottom: var(--sp-3);
+}
+.full {
+  width: 100%;
+}
+
+/* ---- Text utilities ------------------------------------------------------- */
+.muted {
+  color: var(--text-muted);
+}
+.faint {
+  color: var(--text-faint);
+}
+.strong {
+  font-weight: var(--fw-semi);
+}
+.sm {
+  font-size: var(--fs-sm);
+}
+.xs {
+  font-size: var(--fs-xs);
+}
+.big {
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+}
+.ltr {
+  direction: ltr;
+  text-align: start;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nowrap {
+  white-space: nowrap;
+}
+
+/* Section label: small uppercase-ish header above a group of cards */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to left, var(--border), transparent);
+}
+[data-dir='ltr'] .section-title::after {
+  background: linear-gradient(to right, var(--border), transparent);
+}
+
+/* ---- Page header --------------------------------------------------------- */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.page-head-icon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  box-shadow: var(--inner-line);
+}
+.page-head-text {
+  min-width: 0;
+  flex: 1;
+}
+.page-title {
+  font-size: clamp(19px, 2.4vw, var(--fs-3xl));
+  font-weight: var(--fw-black);
+  letter-spacing: -0.02em;
+  background: var(--text-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.2;
+}
+.page-subtitle {
+  margin-top: 3px;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: var(--lh-snug);
+  max-width: 76ch;
+}
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* ---- Animations ---------------------------------------------------------- */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(-100%);
+  }
+}
+[data-dir='ltr'] {
+  --shimmer-to: 100%;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(2%, -3%, 0);
+  }
+}
+
+/* ---- Skeleton ------------------------------------------------------------ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-xs);
+  background: var(--surface-3);
+  height: 12px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 8%, transparent), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+/* ---- Accessibility ------------------------------------------------------- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: .01ms !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
+    transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  // Spinners still need to actually spin, or they read as a frozen glyph.
-  [aria-label='loading'] { animation: spin 1s linear infinite !important; }
 }
 
-// PERF: drop every decorative blur/glow when the device asks for it, or when
-// the user prefers reduced transparency. backdrop-filter is the single most
-// expensive thing in this panel on low-end GPUs.
 @media (prefers-reduced-transparency: reduce) {
-  .sidebar, .topbar, .auth-card, .toast, .modal-backdrop, .cmdk-backdrop {
-    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  body::before {
+    display: none;
   }
-  .auth-aurora, body::before { display: none; }
+  .topbar,
+  .modal-backdrop,
+  .cmdk-backdrop {
+    backdrop-filter: none !important;
+  }
+}
+
+@media print {
+  .sidebar,
+  .topbar,
+  .toasts {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
 }

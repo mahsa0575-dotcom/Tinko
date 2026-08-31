@@ -1,218 +1,657 @@
-// App shell: RTL/LTR-aware sidebar + topbar + content area.
-.app-shell { display: flex; height: 100vh; overflow: hidden; }
+/* ============================================================================
+   Tinko Admin — Layout: shell, sidebar, topbar, auth, command palette,
+   dashboard & VPS composition
+   ========================================================================== */
 
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.shell-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   SIDEBAR
+   ========================================================================== */
 .sidebar {
-  width: 252px; flex-shrink: 0; display: flex; flex-direction: column;
-  // PERF: was a translucent surface + blur(14px). The sidebar is a tall,
-  // always-visible element, so its blur layer was repainted on every scroll of
-  // the content area. An opaque token gives the same visual weight for free.
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sidebar);
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-3);
   background: var(--sidebar-bg);
   border-inline-end: 1px solid var(--border);
-  padding: 16px 12px 14px; overflow-y: auto;
-  // Keeps the nav list a separate, cheap compositor layer.
+  overflow-y: auto;
+  overflow-x: hidden;
   contain: layout paint;
-  .brand { display: flex; align-items: center; gap: 11px; padding: 6px 10px 20px;
-    .logo {
-      width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
-      background: var(--brand-gradient);
-      display: flex; align-items: center; justify-content: center; color: #fff;
-      box-shadow: 0 4px 16px var(--primary-glow);
-      position: relative; overflow: hidden;
-      &::after { content: ''; position: absolute; inset: 0;
-        background: linear-gradient(200deg, rgba(255,255,255,.32), transparent 45%); }
-      svg { width: 20px; height: 20px; position: relative; z-index: 1; }
-    }
-    .brand-name { font-weight: 800; font-size: 15.5px; letter-spacing: -.01em;
-      background: linear-gradient(90deg, var(--text), color-mix(in srgb, var(--text) 62%, var(--primary)));
-      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-    .brand-sub { font-size: 10px; color: var(--text-faint); font-weight: 500; } }
-
-  .nav-section {
-    font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
-    color: var(--text-faint); padding: 16px 12px 6px;
-    display: flex; align-items: center; gap: 8px;
-    &::after { content: ''; flex: 1; height: 1px; background: var(--border); } }
-
-  .nav-item {
-    position: relative;
-    display: flex; align-items: center; gap: 11px; width: 100%;
-    padding: 9px 12px; margin: 2px 0; border-radius: 11px; border: none; background: none;
-    color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; text-align: start;
-    font-family: inherit; transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
-    .icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      svg { width: 17px; height: 17px; } }
-    &:hover { background: color-mix(in srgb, var(--surface-3) 72%, transparent); color: var(--text); }
-    &.active {
-      background: var(--primary-soft); color: var(--primary);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 26%, transparent);
-      &::before { // active glow bar on the inline edge
-        content: ''; position: absolute; inset-inline-start: -12px; top: 20%; bottom: 20%;
-        width: 3px; border-radius: 0 3px 3px 0; background: var(--brand-gradient);
-        box-shadow: 0 0 10px var(--primary-glow);
-      }
-    } }
-
-  .sidebar-foot { margin-top: auto; padding-top: 14px; }
-  .user-card {
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-    border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 70%, transparent);
-    border: 1px solid var(--border);
-    .avatar {
-      width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
-      background: var(--brand-gradient); color: #fff; font-weight: 800; font-size: 13px;
-      display: flex; align-items: center; justify-content: center; }
-    .user-meta { min-width: 0; flex: 1;
-      .user-name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .user-role { font-size: 10.5px; color: var(--text-faint); } } }
 }
 
+/* brand */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3) var(--sp-5);
+  min-width: 0;
+}
+.brand-text {
+  min-width: 0;
+}
+.logo {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--r-md);
+  background: var(--logo-grad);
+  color: #fff;
+  box-shadow: var(--shadow-blue);
+}
+.brand-name {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-black);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--text);
+}
+.brand-sub {
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+}
+
+/* nav */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--sp-4);
+}
+.nav-section {
+  padding: 0 var(--sp-3) var(--sp-2);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 40px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.nav-item .icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  flex-shrink: 0;
+  color: currentColor;
+}
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.nav-item.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: var(--fw-semi);
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  height: 20px;
+  width: 3px;
+  margin-top: -10px;
+  border-radius: 0 3px 3px 0;
+  background: var(--primary);
+}
+[data-dir='ltr'] .nav-item.active::before {
+  border-radius: 3px 0 0 3px;
+}
+.nav-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* footer user card */
+.sidebar-foot {
+  margin-top: auto;
+  padding-top: var(--sp-3);
+}
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  min-width: 0;
+}
+.user-meta {
+  flex: 1;
+  min-width: 0;
+}
+.user-name {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semi);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-role {
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   TOPBAR
+   ========================================================================== */
 .topbar {
-  height: 60px; flex-shrink: 0; display: flex; align-items: center; gap: 10px;
-  // PERF: blur(12px) here sat on top of the scrolling content and forced a
-  // full-width readback each frame. Since the topbar does not overlap the
-  // scroll area (it is a flex sibling), the blur was purely decorative.
+  position: sticky;
+  top: 0;
+  z-index: var(--z-topbar);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--topbar-h);
+  padding: 0 clamp(12px, 2.4vw, 26px);
   background: var(--topbar-bg);
-  border-bottom: 1px solid var(--border); padding: 0 22px;
-  .search-trigger {
-    display: flex; align-items: center; gap: 9px; color: var(--text-faint);
-    background: color-mix(in srgb, var(--surface-2) 72%, transparent); border: 1px solid var(--border); border-radius: 11px;
-    padding: 8px 13px; font-size: 12.5px; cursor: pointer; min-width: 230px; font-family: inherit;
-    transition: border-color var(--t-fast), color var(--t-fast);
-    svg { width: 15px; height: 15px; }
-    &:hover { border-color: var(--border-strong); color: var(--text-muted); }
-    kbd { margin-inline-start: auto; } }
+  backdrop-filter: blur(14px) saturate(150%);
+  border-bottom: 1px solid var(--border);
 }
 
-.content { flex: 1; overflow-y: auto; overflow-x: hidden; contain: layout; }
-.language-toggle { min-width: 48px; }
-
-// ---------- tablet / small laptop (761–1100px) ----------
-// Previously the layout jumped straight from the 1100px desktop grid to the
-// 760px phone shell, so tablets got desktop paddings with phone-sized space.
-@media (max-width: 1100px) {
-  .sidebar { width: 74px; padding: 14px 8px 12px; }
-  .sidebar .brand { justify-content: center; padding: 6px 0 18px; }
-  .sidebar .brand-name, .sidebar .brand-sub { display: none; }
-  .sidebar .nav-section { padding: 14px 0 6px; justify-content: center;
-    font-size: 0; &::after { display: none; } }
-  .sidebar .nav-item { justify-content: center; padding: 10px 0; gap: 0;
-    font-size: 0; line-height: 0;
-    .icon svg { width: 19px; height: 19px; } }
-  .sidebar .user-card { justify-content: center; padding: 8px; }
-  .sidebar .user-meta { display: none; }
-  .topbar { padding: 0 16px; }
-  .search-trigger { min-width: 0; flex: 1; max-width: 320px; }
-  .studio { grid-template-columns: 1fr; }
+.sidebar-toggle {
+  display: none;
 }
 
-@media (max-width: 760px) {
-  .app-shell { display: block; min-height: 100%; padding-bottom: 68px; }
-  // The bottom tab bar DOES overlap scrolling content, so the blur is earned
-  // here — but it is the only blurred chrome left on mobile.
-  .sidebar { position: fixed; inset: auto 0 0; z-index: 40; width: 100%; height: 68px; display: flex; align-items: stretch; padding: 7px 8px; overflow-x: auto; overflow-y: hidden; border-inline-end: 0; border-top: 1px solid var(--border); background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
-  .brand, .nav-section, .sidebar-foot { display: none; }
-  .sidebar > div { display: contents; }
-  .nav-item { flex: 0 0 auto; padding: 9px 10px; font-size: 10px; gap: 5px; border-radius: 10px;
-    justify-content: center; flex-direction: column; line-height: 1.3;
-    .icon svg { width: 18px; height: 18px; } }
-  .nav-item .icon { margin: 0; }
-  .topbar { padding: 10px 16px; }
-  .search-trigger { min-width: 0; flex: 1; }
-  .page { padding: 20px 16px 28px; }
-  .page-title { font-size: 19px; }
-  .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .metric { padding: 13px; }
-  .metric .metric-value { font-size: 21px; }
-  .toasts { inset-inline: 14px; bottom: 82px; }
-  .toast { min-width: 0; }
-  .resource-overview { padding: 15px; border-radius: 16px; }
-  .resource-overview-head { align-items: flex-start; flex-direction: column; }
-  .resource-current, .resource-chart-grid { grid-template-columns: 1fr; }
-  .range-switch { width: 100%; }
-  .range-switch button { flex: 1; }
+.search-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 34px;
+  min-width: 0;
+  max-width: 340px;
+  flex: 1;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-inset);
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: all var(--t-fast) var(--ease);
+}
+.search-trigger:hover {
+  border-color: var(--primary);
+  color: var(--text-muted);
+  background: var(--surface-2);
+}
+.search-trigger > span {
+  flex: 1;
+  min-width: 0;
+  text-align: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-trigger kbd {
+  flex-shrink: 0;
 }
 
-// Command palette
-.cmdk-backdrop { position: fixed; inset: 0; background: rgba(3, 6, 14, .72); z-index: 70;
-  display: flex; justify-content: center; padding-top: 12vh; animation: fade-in .15s ease; }
+.language-toggle {
+  min-width: 52px;
+  font-weight: var(--fw-bold);
+}
+
+/* ==========================================================================
+   COMMAND PALETTE
+   ========================================================================== */
+.cmdk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-backdrop);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(48px, 12vh, 130px) var(--sp-4) var(--sp-4);
+  background: color-mix(in srgb, var(--bg-deep) 78%, transparent);
+  animation: fade-in var(--t-fast) var(--ease) both;
+}
 .cmdk {
-  width: 100%; max-width: 530px; height: fit-content; max-height: 55vh; overflow-y: auto;
-  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 18px;
-  box-shadow: var(--shadow-3); padding: 10px; animation: modal-in .2s var(--ease);
-  .cmdk-input { width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
-    border-radius: 11px; padding: 12px 15px; font-size: 14px; font-family: inherit; margin-bottom: 8px;
-    &:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); } }
-  .cmdk-item { display: flex; align-items: center; gap: 11px; padding: 10px 13px; border-radius: 11px;
-    cursor: pointer; font-size: 13px; color: var(--text-muted); transition: background .12s, color .12s;
-    svg { width: 16px; height: 16px; flex-shrink: 0; }
-    &.selected, &:hover { background: var(--primary-soft); color: var(--primary); }
-    .cmdk-hint { margin-inline-start: auto; font-size: 11px; color: var(--text-faint); } }
+  width: 100%;
+  max-width: 560px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-4);
+  overflow: hidden;
+  animation: rise var(--t-med) var(--ease-out) both;
+}
+.cmdk-input {
+  height: 52px;
+  padding: 0 var(--sp-5);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-lg);
+  flex-shrink: 0;
+}
+.cmdk-input:focus {
+  outline: none;
+}
+.cmdk-input::placeholder {
+  color: var(--text-faint);
+}
+.cmdk-list {
+  overflow-y: auto;
+  padding: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 40px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+}
+.cmdk-item > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmdk-item.selected {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.cmdk-item.muted {
+  color: var(--text-faint);
+  cursor: default;
+  justify-content: center;
+}
+.cmdk-hint {
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  flex-shrink: 0;
 }
 
-// ---------- Login ----------
+/* ==========================================================================
+   AUTH PAGE
+   ========================================================================== */
 .auth-page {
-  position: relative; display: flex; align-items: center; justify-content: center;
-  height: 100vh; overflow: hidden; padding: 20px;
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-5);
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 0%, var(--bg) 0%, var(--bg-deep) 100%);
 }
-// PERF: three 320–500px orbs each running `filter: blur(80px)` on an infinite
-// animation is ~3 large offscreen gaussian passes per frame, forever, on the
-// login screen. The gradients already fade to transparent, so the heavy blur
-// added almost nothing visually — reduced to blur(48px), and the two secondary
-// orbs are now static (only orb-1 drifts). `will-change` promotes just that one.
 .auth-aurora {
-  position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  contain: strict;
-  .orb { position: absolute; border-radius: 50%; filter: blur(48px); opacity: .42; }
-  .orb-1 { width: 500px; height: 500px; top: -170px; inset-inline-start: -120px;
-    background: radial-gradient(circle, rgba(47, 107, 255, .45), transparent 65%);
-    animation: orb-float 22s ease-in-out infinite alternate;
-    will-change: transform; }
-  .orb-2 { width: 430px; height: 430px; bottom: -150px; inset-inline-end: -110px;
-    background: radial-gradient(circle, rgba(56, 163, 248, .3), transparent 65%); }
-  .orb-3 { width: 320px; height: 320px; bottom: 8%; inset-inline-start: 26%;
-    background: radial-gradient(circle, rgba(28, 79, 214, .3), transparent 65%); }
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
-@keyframes orb-float { from { transform: translate(0, 0) scale(1); } to { transform: translate(26px, -30px) scale(1.06); } }
-
-// Small screens do not need the orb field at all.
-@media (max-width: 760px) { .auth-aurora .orb-3 { display: none; } }
-@media (prefers-reduced-motion: reduce) { .auth-aurora .orb-1 { animation: none; will-change: auto; } }
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(52px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.orb-1 {
+  width: 460px;
+  height: 460px;
+  top: -140px;
+  inset-inline-end: -110px;
+  background: var(--primary);
+  animation: float-slow 16s var(--ease) infinite;
+}
+.orb-2 {
+  width: 380px;
+  height: 380px;
+  bottom: -130px;
+  inset-inline-start: -90px;
+  background: var(--accent);
+  opacity: 0.32;
+}
+.orb-3 {
+  width: 300px;
+  height: 300px;
+  top: 42%;
+  inset-inline-start: 46%;
+  background: var(--accent-2);
+  opacity: 0.2;
+}
 
 .auth-card {
-  width: 100%; max-width: 410px; padding: 38px clamp(20px, 6vw, 36px) 34px;
-  // blur(18px) → blur(10px): the card sits over soft gradients, not detail, so
-  // the extra radius cost nothing but GPU time.
-  background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--border-strong); border-radius: 22px; box-shadow: var(--shadow-3);
-  animation: auth-in .45s var(--ease) both;
-  .auth-logo { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-bottom: 30px;
-    .logo {
-      width: 58px; height: 58px; border-radius: 17px;
-      background: var(--brand-gradient);
-      display: flex; align-items: center; justify-content: center; color: #fff;
-      box-shadow: 0 10px 32px var(--primary-glow); position: relative; overflow: hidden;
-      &::after { content: ''; position: absolute; inset: 0;
-        background: linear-gradient(200deg, rgba(255,255,255,.35), transparent 45%); }
-      svg { width: 28px; height: 28px; position: relative; z-index: 1; } }
-    h2 { font-size: 21px; }
-    .auth-tagline { color: var(--text-muted); font-size: 12.5px; margin-top: -6px; } }
-  .auth-foot { margin-top: 22px; text-align: center; font-size: 11.5px; color: var(--text-faint); }
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: clamp(24px, 4vw, 38px);
+  border-radius: var(--r-xl);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-4);
+  animation: rise var(--t-slow) var(--ease-out) both;
 }
-@keyframes auth-in { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: none; } }
+.auth-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  text-align: center;
+  margin-bottom: var(--sp-2);
+}
+.auth-logo .logo {
+  width: 54px;
+  height: 54px;
+  border-radius: var(--r-lg);
+  margin-bottom: var(--sp-2);
+}
+.auth-logo h2 {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-black);
+  letter-spacing: -0.02em;
+}
+.auth-tagline {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.auth-foot {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  text-align: center;
+  line-height: var(--lh-snug);
+}
 
-// ---------- VPS page specifics ----------
-// `minmax(170px, ...)` overflowed below ~190px of available width (phone with
-// the RTL padding). `min()` clamps the floor to the container itself.
-.vps-top-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 14px; margin-bottom: 20px; }
-.vps-value-row { display: flex; align-items: baseline; gap: 8px;
-  .big { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; } .unit { color: var(--text-faint); font-size: 12px; } }
+/* ==========================================================================
+   DASHBOARD
+   ========================================================================== */
+.dashboard-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+}
 
-// ---------- Personality studio: 3-panel ----------
-.studio { display: grid; grid-template-columns: 300px 1fr 340px; gap: 16px; align-items: start;
-  @media (max-width: 1200px) { grid-template-columns: 1fr; } }
-.chat-panel { display: flex; flex-direction: column; height: 520px;
-  .chat-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 6px 2px; }
-  .bubble { max-width: 85%; padding: 9px 14px; border-radius: 15px; font-size: 13px; line-height: 1.75; white-space: pre-wrap;
-    &.user { align-self: flex-start; background: var(--brand-gradient); color: #fff; border-end-start-radius: 5px; box-shadow: 0 2px 10px var(--primary-glow); }
-    &.bot { align-self: flex-end; background: var(--surface-3); border-end-end-radius: 5px; } }
-  .chat-input-row { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); } }
+.resource-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1), var(--inner-line);
+}
+.resource-overview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--border-soft);
+}
+.resource-current {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  gap: var(--sp-3);
+}
+.resource-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--sp-4);
+}
+.resource-chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  min-width: 0;
+}
+.resource-chart-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  color: var(--text-2);
+}
+.resource-average {
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.title-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--r-xs);
+  background: var(--surface-4);
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   VPS
+   ========================================================================== */
+.vps-top-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+  gap: var(--sp-4);
+}
+.vps-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.vps-value-row .num {
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: var(--fw-black);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text);
+}
+.vps-value-row .unit {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  font-weight: var(--fw-med);
+}
+.vps-gauge-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+/* Tablet: collapse sidebar into an icon rail */
+@media (max-width: 1180px) {
+  :root {
+    --sidebar-w: var(--sidebar-rail-w);
+  }
+  .sidebar {
+    padding-inline: var(--sp-2);
+    align-items: stretch;
+  }
+  .brand {
+    justify-content: center;
+    padding: var(--sp-2) 0 var(--sp-4);
+  }
+  .brand-text {
+    display: none;
+  }
+  .nav-section {
+    text-align: center;
+    padding: 0 0 var(--sp-2);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav-item {
+    justify-content: center;
+    padding: 0;
+    height: 42px;
+  }
+  .nav-item-label {
+    display: none;
+  }
+  .nav-item .icon {
+    width: auto;
+  }
+  .user-card {
+    justify-content: center;
+    padding: var(--sp-2);
+  }
+  .user-meta {
+    display: none;
+  }
+  .user-card .icon-btn {
+    display: none;
+  }
+}
+
+/* Mobile: sidebar becomes an off-canvas drawer */
+@media (max-width: 780px) {
+  .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(280px, 84vw);
+    padding-inline: var(--sp-3);
+    box-shadow: var(--shadow-4);
+    transform: translateX(calc(-105% * var(--flip)));
+    transition: transform var(--t-med) var(--ease);
+  }
+  .sidebar.open {
+    transform: none;
+  }
+  .sidebar.open .brand {
+    justify-content: flex-start;
+    padding-inline: var(--sp-3);
+  }
+  .sidebar.open .brand-text,
+  .sidebar.open .nav-item-label,
+  .sidebar.open .user-meta,
+  .sidebar.open .user-card .icon-btn {
+    display: block;
+  }
+  .sidebar.open .nav-section {
+    text-align: start;
+    padding-inline: var(--sp-3);
+    font-size: var(--fs-2xs);
+  }
+  .sidebar.open .nav-item {
+    justify-content: flex-start;
+    padding: 0 var(--sp-3);
+  }
+  .sidebar.open .nav-item .icon {
+    width: 22px;
+  }
+  .sidebar.open .user-card {
+    justify-content: flex-start;
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-sidebar) - 1);
+    background: color-mix(in srgb, var(--bg-deep) 65%, transparent);
+    animation: fade-in var(--t-fast) var(--ease) both;
+  }
+  .sidebar-toggle {
+    display: inline-grid;
+  }
+  .search-trigger {
+    max-width: none;
+  }
+  .search-trigger > span,
+  .search-trigger kbd {
+    display: none;
+  }
+  .search-trigger {
+    width: 34px;
+    flex: 0 0 34px;
+    justify-content: center;
+    padding: 0;
+  }
+  .resource-overview {
+    padding: var(--sp-4);
+  }
+  .auth-card {
+    padding: var(--sp-6) var(--sp-5);
+  }
+  .orb-3 {
+    display: none;
+  }
+}
