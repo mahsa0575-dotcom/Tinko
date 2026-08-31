@@ -92,11 +92,11 @@ export async function buildServer(overrides = {}) {
     log.warn('admin panel static serving unavailable', { error: err.message });
   }
 
-  await fastify.register(authPlugin, { ctx });
-  await fastify.register(registerAiRoutes, { ctx });
-  await fastify.register(registerCommunityRoutes, { ctx });
-  await fastify.register(registerPlatformRoutes, { ctx });
-  await fastify.register(registerDebugRoutes, { ctx });
+  await fastify.register(authPlugin, { ctx, prefix: '/api/v1' });
+  await fastify.register(registerAiRoutes, { ctx, prefix: '/api/v1' });
+  await fastify.register(registerCommunityRoutes, { ctx, prefix: '/api/v1' });
+  await fastify.register(registerPlatformRoutes, { ctx, prefix: '/api/v1' });
+  await fastify.register(registerDebugRoutes, { ctx, prefix: '/api/v1' });
 
   // OpenAPI documentation (served as JSON; a future panel page renders it)
   fastify.get('/api/v1/openapi.json', async () => ({
