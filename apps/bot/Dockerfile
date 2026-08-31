@@ -8,6 +8,10 @@ COPY packages/ai/package.json packages/ai/
 COPY apps/bot/package.json apps/bot/
 RUN npm install --workspace @botai/bot --workspace @botai/core --workspace @botai/db --workspace @botai/ai --ignore-scripts
 
+# ---- sources ----
+COPY packages ./packages
+COPY apps/bot ./apps/bot
+
 # ---- runtime ----
 FROM node:22-alpine
 WORKDIR /app

@@ -7,12 +7,13 @@ COPY packages/db/package.json packages/db/
 COPY packages/ai/package.json packages/ai/
 COPY apps/api/package.json apps/api/
 COPY apps/admin/package.json apps/admin/
-COPY migrations ./migrations
-COPY scripts ./scripts
-COPY package.json ./package.json
 RUN npm install --workspace @botai/api --workspace @botai/core --workspace @botai/db --workspace @botai/ai --workspace @botai/admin --ignore-scripts
 
-# ---- build admin panel ----
+# ---- sources (runtime code + admin panel) ----
+COPY migrations ./migrations
+COPY scripts ./scripts
+COPY packages ./packages
+COPY apps/api ./apps/api
 COPY apps/admin ./apps/admin
 RUN npm run build -w @botai/admin
 

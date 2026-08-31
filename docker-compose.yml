@@ -5,13 +5,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: botai
+      POSTGRES_USER: ${DB_USER:-tinko}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?set DATABASE_PASSWORD}
-      POSTGRES_DB: botai
+      POSTGRES_DB: ${DB_NAME:-tinko}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U botai -d botai"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tinko} -d ${DB_NAME:-tinko}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,7 +45,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${API_PORT:-8080}:8080"
+      - "${API_PORT:-8080}:${API_PORT:-8080}"
 
   bot:
     build:
@@ -60,12 +60,12 @@ services:
         condition: service_healthy
     # Wait for API (which runs migrations) before starting the pipeline
     command: >
-      sh -c "until wget -q -O- http://api:8080/health >/dev/null 2>&1; do
+      sh -c "until wget -q -O- http://api:${API_PORT:-8080}/health >/dev/null 2>&1; do
       echo waiting-for-api-migrations; sleep 2; done;
       node apps/bot/src/index.js"
     ports:
       # webhook receiver — proxied by reverse proxy, never public
-      - "127.0.0.1:8081:8081"
+      - "127.0.0.1:${BOT_WEBHOOK_PORT:-8081}:${BOT_WEBHOOK_PORT:-8081}"
 
   worker:
     build:
@@ -79,7 +79,7 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "until wget -q -O- http://api:8080/health >/dev/null 2>&1; do
+      sh -c "until wget -q -O- http://api:${API_PORT:-8080}/health >/dev/null 2>&1; do
       echo waiting-for-api-migrations; sleep 2; done;
       node apps/worker/src/index.js"
 
