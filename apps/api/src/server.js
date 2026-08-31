@@ -6,7 +6,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { Errors, setLogLevel } from '@botai/core';
 import { createContext } from './context.js';
-import { authPlugin } from './auth.js';
+import authPlugin from './auth.js';
 import { registerAiRoutes } from './routes/ai-routes.js';
 import { registerCommunityRoutes } from './routes/community-routes.js';
 import { registerPlatformRoutes } from './routes/platform-routes.js';

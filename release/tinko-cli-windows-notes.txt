@@ -1,0 +1,7 @@
+Tinko v0.4.0 — Windows notes
+==============================
+
+- Full platform runs via Docker Desktop: extract Tinko-0.4.0-source.zip,
+  copy .env.example to .env, then: docker compose up -d --build
+- The tinko CLI requires bash: use WSL2 (recommended) or Git Bash:
+  bash tinko setup

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import fp from 'fastify-plugin';
 import { Errors, AppError, hmacSign, safeEqual, randomToken, newId,
   encryptSecret, decryptSecret, generateTotpSecret, verifyTotp, sha256Hex } from '@botai/core';
 
@@ -32,7 +33,7 @@ function verifyAccess(token, secret) {
 }
 
 /** Fastify plugin wiring auth routes + request decorators. */
-export async function authPlugin(fastify, { ctx }) {
+async function authPlugin(fastify, { ctx }) {
   const { repos, config } = ctx;
 
   // ---- decorators ----
@@ -196,3 +197,7 @@ export async function authPlugin(fastify, { ctx }) {
     return { ok: true };
   });
 }
+
+// fastify-plugin: expose decorators (authenticate/requirePermission) to sibling plugins
+export default fp(authPlugin, { name: 'auth', dependencies: [] });
+export { authPlugin };
