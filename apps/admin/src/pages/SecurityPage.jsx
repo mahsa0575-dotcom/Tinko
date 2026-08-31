@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { fmtTime, t } from '../lib/i18n.js';
 import { useStore } from '../state/store.jsx';
+import { Icon } from '../components/icons.jsx';
 
 /** Security page: 2FA (TOTP + recovery codes) + active sessions (spec §121–123). */
 export function SecurityPage() {
@@ -53,12 +54,12 @@ export function SecurityPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">🔐 امنیت</h1>
+      <h1 className="page-title"><span className="title-icon"><Icon name="lock" size={20} /></span>{t('security')}</h1>
       <p className="page-subtitle">ورود دو مرحله‌ای و مدیریت نشست‌ها</p>
 
       <div className="grid grid-2">
         <div className="card">
-          <div className="card-title">🛡️ ورود دو مرحله‌ای (TOTP)</div>
+          <div className="card-title"><Icon name="shieldCheck" size={14} /> ورود دو مرحله‌ای (TOTP)</div>
           {!setup && !enabled && (
             <button className="btn primary" onClick={startSetup}>فعال‌سازی 2FA</button>
           )}
@@ -86,7 +87,7 @@ export function SecurityPage() {
           )}
           {recoveryCodes && (
             <div className="card mt" style={{ borderColor: 'var(--warning)' }}>
-              <div className="card-title">⚠️ کدهای بازیابی (فقط همین یک بار نمایش داده می‌شوند)</div>
+              <div className="card-title"><Icon name="alert" size={14} /> کدهای بازیابی (فقط همین یک بار نمایش داده می‌شوند)</div>
               <pre className="mono" style={{ direction: 'ltr', textAlign: 'center', fontSize: 13 }}>
                 {recoveryCodes.join('\n')}
               </pre>
@@ -96,7 +97,7 @@ export function SecurityPage() {
         </div>
 
         <div className="card">
-          <div className="card-title">💻 نشست‌های فعال <button className="btn sm ghost" onClick={loadSessions}>🔄</button></div>
+          <div className="card-title"><Icon name="terminal" size={14} /> نشست‌های فعال <button className="btn sm ghost icon" onClick={loadSessions}><Icon name="refresh" size={13} /></button></div>
           {(sessions ?? []).map((s) => (
             <div key={s.id} className="row" style={{ justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
               <div>

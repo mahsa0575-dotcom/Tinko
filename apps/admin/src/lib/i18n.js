@@ -24,8 +24,9 @@ const dict = {
     processes: 'پروسه‌ها', services: 'سرویس‌ها', server_info: 'اطلاعات سرور', uptime: 'مدت فعالیت',
     history: 'تاریخچه', live: 'زنده', unavailable: 'در دسترس نیست',
     // auth
-    login_title: 'ورود به پنل مدیریت', email: 'ایمیل', password: 'گذرواژه', login: 'ورود',
-    login_failed: 'ورود ناموفق بود',
+    login_title: 'ورود به پنل مدیریت', login_tagline: 'برای ادامه وارد شوید', email: 'ایمیل', password: 'گذرواژه', login: 'ورود',
+    login_failed: 'ورود ناموفق بود', role_admin: 'مدیر سیستم',
+    totp_label: 'کد دو مرحله‌ای (TOTP یا کد بازیابی)',
   },
   en: {
     nav_main: 'Main', nav_ai: 'AI', nav_community: 'Community', nav_system: 'System',
@@ -46,8 +47,9 @@ const dict = {
     cpu: 'CPU', ram: 'RAM', swap: 'Swap', disk: 'Disk', network: 'Network', load: 'Load',
     processes: 'Processes', services: 'Services', server_info: 'Server Info', uptime: 'Uptime',
     history: 'History', live: 'Live', unavailable: 'Unavailable',
-    login_title: 'Admin Panel Login', email: 'Email', password: 'Password', login: 'Sign in',
-    login_failed: 'Login failed',
+    login_title: 'Admin Panel Login', login_tagline: 'Sign in to continue', email: 'Email', password: 'Password', login: 'Sign in',
+    login_failed: 'Login failed', role_admin: 'System Administrator',
+    totp_label: 'Two-factor code (TOTP or recovery code)',
   },
 };
 

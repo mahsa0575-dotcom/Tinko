@@ -58,8 +58,19 @@ export function createAdminRepo(pool) {
       const { rows } = await pool.query(`SELECT * FROM admin_sessions WHERE id = $1`, [sessionId]);
       return rows[0] ?? null;
     },
-    revokeSession: async (sessionId) => {
-      await pool.query(`UPDATE admin_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, [sessionId]);
+    /**
+     * Revoke a session. Pass `adminId` to scope the revocation to its owner —
+     * without it any authenticated admin could revoke anyone else's session.
+     * Returns the number of sessions actually revoked.
+     */
+    revokeSession: async (sessionId, adminId = null) => {
+      // admin_id is bigint: the parameter must be cast to ::bigint (not ::text)
+      // or Postgres rejects the comparison with "operator does not exist".
+      const { rowCount } = await pool.query(
+        `UPDATE admin_sessions SET revoked_at = now()
+         WHERE id = $1 AND revoked_at IS NULL AND ($2::bigint IS NULL OR admin_id = $2::bigint)`,
+        [sessionId, adminId]);
+      return rowCount;
     },
     revokeAllSessions: async (adminId, exceptId = null) => {
       await pool.query(

@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { fmtNum, fmtTime, t } from '../lib/i18n.js';
 import { DataTable, StatusBadge, Modal } from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
+import { Icon } from '../components/icons.jsx';
 
 const RESPONSE_MODES = ['mention', 'reply', 'mention_reply', 'command', 'always', 'smart', 'conversation', 'admin_only', 'silent'];
 
@@ -98,13 +99,13 @@ export function GroupsPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">👥 {t('groups')}</h1>
+      <h1 className="page-title"><span className="title-icon"><Icon name="users" size={20} /></span>{t('groups')}</h1>
       <p className="page-subtitle">{rows ? `${fmtNum(rows.length)} group(s)` : t('loading')}</p>
       <div className="row" style={{ marginBottom: 14 }}>
         <input className="input" style={{ maxWidth: 280 }} placeholder={t('search')}
           value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="spacer" />
-        <button className="btn" onClick={load}>🔄 {t('refresh')}</button>
+        <button className="btn" onClick={load}><Icon name="refresh" size={14} /> {t('refresh')}</button>
       </div>
 
       {/* Bulk operations bar (spec §193) */}
@@ -131,7 +132,7 @@ export function GroupsPage() {
 
       <DataTable loading={!rows} rows={rows} emptyText="هیچ گروهی ثبت نشده است — ربات را به گروه اضافه کنید"
         columns={[
-          { key: '_select', label: '☑', sortable: false, render: (g) => (
+          { key: '_select', label: '', sortable: false, render: (g) => (
             <input type="checkbox" checked={selected.has(g.id)} onChange={() => toggle(g.id)} />
           )},
           { key: 'title', label: 'Title', render: (g) => (
@@ -147,15 +148,15 @@ export function GroupsPage() {
           { key: 'last_activity', label: 'Last activity', render: (g) => fmtTime(g.last_activity) },
           { key: 'actions', label: t('actions'), sortable: false, render: (g) => (
             <div className="row">
-              <button className="btn sm" onClick={() => openSettings(g)}>⚙️</button>
-              <button className="btn sm" title="دیباگر پیکربندی" onClick={() => openDebug(g)}>🔍</button>
+              <button className="btn sm" onClick={() => openSettings(g)}><Icon name="settings" size={13} /></button>
+              <button className="btn sm" title="دیباگر پیکربندی" onClick={() => openDebug(g)}><Icon name="search" size={13} /></button>
             </div>
           )},
         ]}
       />
 
       {editing && settings && (
-        <Modal title={`⚙️ ${editing.title ?? editing.id}`} onClose={() => { setEditing(null); setTemplatePreview(null); }}>
+        <Modal title={`${editing.title ?? editing.id}`} onClose={() => { setEditing(null); setTemplatePreview(null); }}>
           <div className="grid grid-2">
             <div className="field"><label>AI</label>
               <select className="select" value={String(settings.ai_enabled)}
@@ -211,7 +212,7 @@ export function GroupsPage() {
       )}
 
       {debug && (
-        <Modal title={`🔍 دیباگر پیکربندی — ${debug.group.title ?? debug.group.id}`} onClose={() => setDebug(null)} wide>
+        <Modal title={`دیباگر پیکربندی — ${debug.group.title ?? debug.group.id}`} onClose={() => setDebug(null)} wide>
           {debug.resolution.map((layer, i) => (
             <div key={i} className="card" style={{ marginBottom: 10, padding: 12 }}>
               <div className="row" style={{ justifyContent: 'space-between' }}>

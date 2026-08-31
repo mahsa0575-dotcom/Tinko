@@ -6,7 +6,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { Errors, setLogLevel } from '@botai/core';
 import { createContext } from './context.js';
-import authPlugin from './auth.js';
+import authPlugin, { authRoutes } from './auth.js';
 import { registerAiRoutes } from './routes/ai-routes.js';
 import { registerCommunityRoutes } from './routes/community-routes.js';
 import { registerPlatformRoutes } from './routes/platform-routes.js';
@@ -33,8 +33,14 @@ export async function buildServer(overrides = {}) {
   }
 
   await fastify.register(helmet, { contentSecurityPolicy: false });
+  // The panel is served same-origin from this server, so no cross-origin access is
+  // needed by default. CORS_ORIGINS (comma-separated) opts specific origins in.
+  // Reflecting every origin with credentials:true would let any site issue
+  // authenticated requests with the user's refresh cookie.
+  const corsOrigins = String(ctx.config.CORS_ORIGINS ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
   await fastify.register(cors, {
-    origin: ctx.config.NODE_ENV === 'production' ? true : true,
+    origin: corsOrigins.length ? corsOrigins : false,
     credentials: true,
   });
   await fastify.register(cookie);
@@ -57,8 +63,21 @@ export async function buildServer(overrides = {}) {
   // Standard error format; AppError codes pass through, everything else is hidden.
   fastify.setErrorHandler((err, req, reply) => {
     if (err.statusCode === 429) err = Errors.rateLimited();
-    const isApp = err.name === 'AppError' || err.statusCode && err.statusCode < 500 && err.name !== 'FastifyError';
-    const status = isApp ? err.statusCode ?? 500 : 500;
+
+    // Fastify schema-validation failures are client errors, not bugs.
+    if (err.validation) {
+      const details = err.validation.map((v) => ({
+        path: (v.instancePath || v.params?.missingProperty || '').replace(/^\//, ''),
+        message: v.message,
+      }));
+      log.warn('request_error', { ...req.logContext, code: 'VALIDATION_ERROR', error: err.message });
+      return reply.status(400).send({
+        error: { code: 'VALIDATION_ERROR', message: 'Request validation failed', request_id: req.id, details },
+      });
+    }
+
+    const isApp = err.name === 'AppError';
+    const status = isApp ? err.status ?? err.statusCode ?? 500 : 500;
     const code = isApp && err.code ? err.code : 'INTERNAL_ERROR';
     const message = isApp ? err.message : 'Internal server error';
     if (!isApp) log.error('unhandled_error', { ...req.logContext, error: err.message, stack: err.stack });
@@ -71,6 +90,7 @@ export async function buildServer(overrides = {}) {
   fastify.get('/health', async () => ({ status: 'ok', ts: new Date().toISOString() }));
 
   // Serve the built Admin Panel (apps/admin/dist) when present (production).
+  let panelDist = null;
   try {
     const { existsSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
@@ -79,20 +99,28 @@ export async function buildServer(overrides = {}) {
     if (existsSync(distDir)) {
       const fastifyStatic = (await import('@fastify/static')).default;
       await fastify.register(fastifyStatic, { root: distDir, wildcard: false });
-      fastify.setNotFoundHandler((req, reply) => {
-        if (req.raw.url.startsWith('/api/') || req.raw.url.startsWith('/webhooks/')) {
-          reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Not found', request_id: req.id } });
-        } else {
-          reply.sendFile('index.html'); // SPA routing
-        }
-      });
+      panelDist = distDir;
       log.info('admin panel static assets mounted', { distDir });
     }
   } catch (err) {
     log.warn('admin panel static serving unavailable', { error: err.message });
   }
 
-  await fastify.register(authPlugin, { ctx, prefix: '/api/v1' });
+  // Always install a not-found handler so API 404s keep the error envelope even
+  // when the panel bundle is absent (dev, or an API-only container).
+  fastify.setNotFoundHandler((req, reply) => {
+    const url = req.raw.url ?? '';
+    if (panelDist && !url.startsWith('/api/') && !url.startsWith('/webhooks/')) {
+      return reply.sendFile('index.html'); // SPA routing
+    }
+    return reply.status(404).send({
+      error: { code: 'NOT_FOUND', message: 'Not found', request_id: req.id },
+    });
+  });
+
+  // Decorators first (fp-wrapped, no prefix), then the routes with the prefix.
+  await fastify.register(authPlugin, { ctx });
+  await fastify.register(authRoutes, { ctx, prefix: '/api/v1' });
   await fastify.register(registerAiRoutes, { ctx, prefix: '/api/v1' });
   await fastify.register(registerCommunityRoutes, { ctx, prefix: '/api/v1' });
   await fastify.register(registerPlatformRoutes, { ctx, prefix: '/api/v1' });

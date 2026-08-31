@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { fmtNum, t } from '../lib/i18n.js';
 import { DataTable, StatusBadge, Modal } from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
+import { Icon } from '../components/icons.jsx';
 
 /** Providers page: CRUD, API-key pool, connection test, custom HTTP builder. */
 export function ProvidersPage() {
@@ -53,7 +54,7 @@ export function ProvidersPage() {
     setTesting(provider.id);
     try {
       const result = await api(`/providers/${provider.id}/test`, { method: 'POST', body: {} });
-      toast(result.ok ? `✅ متصل شد (${fmtNum(result.latencyMs)}ms)` : `❌ ${result.error}`, result.ok ? 'success' : 'error');
+      toast(result.ok ? `متصل شد (${fmtNum(result.latencyMs)}ms)` : `${result.error}`, result.ok ? 'success' : 'error');
     } catch (err) { toast(err.message, 'error'); }
     finally { setTesting(null); }
   };
@@ -83,7 +84,7 @@ export function ProvidersPage() {
   return (
     <div className="page">
       <div className="row">
-        <h1 className="page-title">🔌 {t('providers')}</h1>
+        <h1 className="page-title"><span className="title-icon"><Icon name="plug" size={20} /></span>{t('providers')}</h1>
         <div className="spacer" />
         <button className="btn primary" onClick={startCreate}>+ {t('add')}</button>
       </div>
@@ -100,10 +101,10 @@ export function ProvidersPage() {
           { key: 'actions', label: t('actions'), sortable: false, render: (p) => (
             <div className="row">
               <button className="btn sm" onClick={() => testProvider(p)} disabled={testing === p.id}>
-                {testing === p.id ? '…' : '⚡ تست'}
+                {testing === p.id ? '…' : <><Icon name="zap" size={13} />تست</>}
               </button>
-              <button className="btn sm" onClick={() => openKeys(p)}>🔑 کلیدها</button>
-              <button className="btn sm danger" onClick={() => remove(p)}>🗑</button>
+              <button className="btn sm" onClick={() => openKeys(p)}><Icon name="key" size={13} /> کلیدها</button>
+              <button className="btn sm danger" onClick={() => remove(p)}><Icon name="trash" size={13} /></button>
             </div>
           )},
         ]}
@@ -181,7 +182,7 @@ export function ProvidersPage() {
       )}
 
       {keysFor && (
-        <Modal title={`🔑 کلیدهای ${keysFor.display_name}`} onClose={() => setKeysFor(null)}>
+        <Modal title={`کلیدهای ${keysFor.display_name}`} onClose={() => setKeysFor(null)}>
           <div className="row">
             <input className="input" dir="ltr" type="password" placeholder="sk-... یا کلید API"
               value={newKey} onChange={(e) => setNewKey(e.target.value)} />

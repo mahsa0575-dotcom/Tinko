@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { renderTemplate, extractPath, extractResponse } from '../src/custom-http.js';
-import { normalizePersian, createProfanityEngine } from '../../bot/src/moderation/persian.js';
-import { splitForTelegram, escapeHtml } from '../../bot/src/pipeline.js';
-import { createPipeline } from '../../bot/src/pipeline.js';
+import { normalizePersian, createProfanityEngine } from '../../../apps/bot/src/moderation/persian.js';
+import { splitForTelegram, escapeHtml } from '../../../apps/bot/src/pipeline.js';
+import { createPipeline } from '../../../apps/bot/src/pipeline.js';
 
 describe('custom provider template engine', () => {
   it('substitutes scalar variables with JSON escaping', () => {
@@ -79,9 +79,10 @@ describe('pipeline', () => {
     await run({ stopAtFirst: true });
     expect(order).toEqual(['first']);
 
-    // stage failure does not abort the pipeline
+    // stage failure does not abort the pipeline: `second` records itself, throws,
+    // and `third` still runs.
     order.length = 0;
     await run({});
-    expect(order).toEqual(['first', 'third']);
+    expect(order).toEqual(['first', 'second', 'third']);
   });
 });

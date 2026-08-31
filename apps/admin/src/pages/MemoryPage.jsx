@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { fmtNum, fmtTime, t } from '../lib/i18n.js';
 import { DataTable, Modal, ConfirmDialog } from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
+import { Icon } from '../components/icons.jsx';
 
 export function MemoryPage() {
   const { toast } = useStore();
@@ -42,18 +43,18 @@ export function MemoryPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">🧠 {t('memory')}</h1>
+      <h1 className="page-title"><span className="title-icon"><Icon name="memory" size={20} /></span>{t('memory')}</h1>
       <p className="page-subtitle">حافظه‌ی بلندمدت — جداسازی دقیق بین گروه‌ها و کاربران</p>
       <div className="row" style={{ marginBottom: 14 }}>
         <input className="input" style={{ maxWidth: 280 }} placeholder={t('search')}
           value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="spacer" />
-        <button className="btn" onClick={load}>🔄 {t('refresh')}</button>
+        <button className="btn" onClick={load}><Icon name="refresh" size={14} /> {t('refresh')}</button>
       </div>
 
       {/* Memory debugger (spec §120) */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-title">🔍 دیباگر بازیابی حافظه</div>
+        <div className="card-title"><Icon name="search" size={14} /> دیباگر بازیابی حافظه</div>
         <div className="row">
           <input className="input" placeholder="مثلاً: سلام صبحت بخیر — چه چیزی بازیابی می‌شود؟"
             value={debugText} onChange={(e) => setDebugText(e.target.value)}
@@ -89,8 +90,8 @@ export function MemoryPage() {
           { key: 'updated_at', label: 'Updated', render: (m) => fmtTime(m.updated_at) },
           { key: 'actions', label: t('actions'), sortable: false, render: (m) => (
             <div className="row">
-              <button className="btn sm" onClick={() => { setEditing(m); setContent(m.content); setImportance(m.importance); }}>✏️</button>
-              <button className="btn sm danger" onClick={() => setDeleting(m)}>🗑</button>
+              <button className="btn sm" onClick={() => { setEditing(m); setContent(m.content); setImportance(m.importance); }}><Icon name="edit" size={13} /></button>
+              <button className="btn sm danger" onClick={() => setDeleting(m)}><Icon name="trash" size={13} /></button>
             </div>
           )},
         ]}

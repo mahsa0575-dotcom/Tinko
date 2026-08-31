@@ -16,6 +16,9 @@ export class AppError extends Error {
     this.name = 'AppError';
     this.code = code;
     this.status = status;
+    // Fastify (and our error handler) read `statusCode`; keep both in sync or
+    // every AppError silently degrades to a 500.
+    this.statusCode = status;
     this.details = details;
   }
 }

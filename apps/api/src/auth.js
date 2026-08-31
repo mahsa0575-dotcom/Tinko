@@ -32,8 +32,12 @@ function verifyAccess(token, secret) {
   }
 }
 
-/** Fastify plugin wiring auth routes + request decorators. */
-async function authPlugin(fastify, { ctx }) {
+/**
+ * Request decorators only. This half IS fastify-plugin-wrapped, so that
+ * `authenticate` / `requirePermission` escape encapsulation and are visible
+ * to the sibling route plugins that guard their routes with them.
+ */
+async function authDecorators(fastify, { ctx }) {
   const { repos, config } = ctx;
 
   // ---- decorators ----
@@ -60,6 +64,16 @@ async function authPlugin(fastify, { ctx }) {
       : list.every((p) => granted.includes('*') || granted.includes(p));
     if (!ok) throw Errors.forbidden();
   });
+}
+
+/**
+ * Auth routes. Deliberately NOT fastify-plugin-wrapped: `fp` sets `skip-override`,
+ * which makes Fastify silently ignore the `prefix` registration option — that is
+ * exactly what mounted these at /auth/* instead of /api/v1/auth/* and made every
+ * panel login 404. Keep this a plain plugin so the prefix is honoured.
+ */
+async function authRoutes(fastify, { ctx }) {
+  const { repos, config } = ctx;
 
   // ---- helpers ----
   async function issueSession(req, admin, reply) {
@@ -82,6 +96,17 @@ async function authPlugin(fastify, { ctx }) {
   // ---- routes ----
   fastify.post('/auth/login', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    schema: {
+      body: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+          email: { type: 'string', minLength: 3, maxLength: 254 },
+          password: { type: 'string', minLength: 1, maxLength: 512 },
+          code: { type: 'string', maxLength: 32 },
+        },
+      },
+    },
   }, async (req, reply) => {
     const { email, password, code } = req.body ?? {};
     if (!email || !password) throw Errors.validation([{ path: 'email', message: 'email and password required' }]);
@@ -188,7 +213,9 @@ async function authPlugin(fastify, { ctx }) {
     repos.admin.listSessions(req.admin.id));
 
   fastify.delete('/auth/sessions/:id', { onRequest: fastify.authenticate }, async (req) => {
-    await repos.admin.revokeSession(req.params.id);
+    // Scope to the caller: an admin may only revoke their own sessions.
+    const revoked = await repos.admin.revokeSession(req.params.id, req.admin.id);
+    if (!revoked) throw Errors.notFound('Session');
     return { ok: true };
   });
 
@@ -198,6 +225,7 @@ async function authPlugin(fastify, { ctx }) {
   });
 }
 
-// fastify-plugin: expose decorators (authenticate/requirePermission) to sibling plugins
-export default fp(authPlugin, { name: 'auth', dependencies: [] });
-export { authPlugin };
+// fastify-plugin: expose decorators (authenticate/requirePermission) to sibling plugins.
+// Routes are exported separately and registered WITHOUT fp so their prefix applies.
+export default fp(authDecorators, { name: 'auth', dependencies: [] });
+export { authDecorators, authRoutes };

@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { fmtNum, fmtTime, t } from '../lib/i18n.js';
 import { DataTable, StatusBadge, Modal } from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
+import { Icon } from '../components/icons.jsx';
 
 export function UsersPage() {
   const { toast } = useStore();
@@ -41,13 +42,13 @@ export function UsersPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">🙋 {t('users')}</h1>
+      <h1 className="page-title"><span className="title-icon"><Icon name="user" size={20} /></span>{t('users')}</h1>
       <p className="page-subtitle">{rows ? `${fmtNum(rows.length)} کاربر` : t('loading')} — همه‌ی کاربرانی که ربات با آن‌ها تعامل داشته، همراه تعداد پاسخ‌های AI و حافظه‌شان</p>
       <div className="row" style={{ marginBottom: 14 }}>
         <input className="input" style={{ maxWidth: 280 }} placeholder={t('search')}
           value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="spacer" />
-        <button className="btn" onClick={load}>🔄 {t('refresh')}</button>
+        <button className="btn" onClick={load}><Icon name="refresh" size={14} /> {t('refresh')}</button>
       </div>
       <DataTable loading={!rows} rows={rows} emptyText="هنوز کاربری ثبت نشده است"
         columns={[
@@ -60,29 +61,29 @@ export function UsersPage() {
           { key: 'telegram_id', label: 'Telegram ID', render: (u) => <span className="mono">{u.telegram_id}</span> },
           { key: 'message_count', label: 'Messages', render: (u) => fmtNum(u.message_count) },
           { key: 'ai_requests', label: 'پاسخ‌های AI', render: (u) => fmtNum(u.ai_requests) },
-          { key: 'memory_count', label: '🧠 حافظه', render: (u) => fmtNum(u.memory_count) },
+          { key: 'memory_count', label: 'حافظه', render: (u) => fmtNum(u.memory_count) },
           { key: 'status', label: t('status'), render: (u) => <StatusBadge value={u.status} /> },
           { key: 'last_seen_at', label: 'Last seen', render: (u) => fmtTime(u.last_seen_at) },
           { key: 'actions', label: t('actions'), sortable: false, render: (u) => (
             <div className="row">
-              <button className="btn sm" title="حافظه‌ی کاربر" onClick={() => openMemories(u)}>🧠</button>
+              <button className="btn sm" title="حافظه‌ی کاربر" onClick={() => openMemories(u)}><Icon name="memory" size={13} /></button>
               {u.status === 'active'
-                ? <button className="btn sm" onClick={() => setStatus(u, 'shadow_ignored')}>🙈</button>
-                : <button className="btn sm" onClick={() => setStatus(u, 'active')}>✅</button>}
-              <button className="btn sm danger" onClick={() => setStatus(u, 'blocked')}>⛔</button>
+                ? <button className="btn sm" onClick={() => setStatus(u, 'shadow_ignored')}><Icon name="eyeOff" size={13} /></button>
+                : <button className="btn sm" onClick={() => setStatus(u, 'active')}><Icon name="check" size={13} /></button>}
+              <button className="btn sm danger" onClick={() => setStatus(u, 'blocked')}><Icon name="shield" size={13} /></button>
             </div>
           )},
         ]}
       />
 
       {memories && (
-        <Modal title={`🧠 حافظه‌ی ${[memories.user.first_name, memories.user.last_name].filter(Boolean).join(' ') || memories.user.username || memories.user.telegram_id}`}
+        <Modal title={`حافظه‌ی ${[memories.user.first_name, memories.user.last_name].filter(Boolean).join(' ') || memories.user.username || memories.user.telegram_id}`}
           onClose={() => setMemories(null)} wide>
           <p className="muted" style={{ fontSize: 12 }}>
             هر چیزی که ربات درباره‌ی این کاربر به‌یاد دارد — دستوری («یادت باشد»/«فراموش کن»)، استخراج خودکار با AI، یا ثبت‌شده توسط ادمین.
           </p>
           {memories.rows.length === 0 && (
-            <div className="empty"><div className="empty-icon">🧠</div>
+            <div className="empty"><div className="empty-icon"><Icon name="memory" size={24} /></div>
               <div className="empty-title">هیچ حافظه‌ای برای این کاربر ثبت نشده است</div></div>
           )}
           {memories.rows.map((m) => (
@@ -95,7 +96,7 @@ export function UsersPage() {
               </div>
               <div className="row">
                 <StatusBadge value={m.status} />
-                <button className="btn sm danger" onClick={() => deleteMemory(m)}>🗑</button>
+                <button className="btn sm danger" onClick={() => deleteMemory(m)}><Icon name="trash" size={13} /></button>
               </div>
             </div>
           ))}

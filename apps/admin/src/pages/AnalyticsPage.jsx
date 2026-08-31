@@ -3,14 +3,15 @@ import { api } from '../lib/api.js';
 import { fmtNum, t } from '../lib/i18n.js';
 import { MetricCard, Chart } from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
+import { Icon } from '../components/icons.jsx';
 
 const METRICS = [
-  { key: 'ai_requests', label: '🤖 ' + 'درخواست AI' },
-  { key: 'messages', label: '💬 پیام‌ها' },
-  { key: 'tokens', label: '🎫 توکن‌ها' },
-  { key: 'cost', label: '💰 هزینه' },
-  { key: 'errors', label: '🚨 خطاها' },
-  { key: 'moderation', label: '🛡️ مدریشن' },
+  { key: 'ai_requests', label: 'درخواست AI' },
+  { key: 'messages', label: 'پیام‌ها' },
+  { key: 'tokens', label: 'توکن‌ها' },
+  { key: 'cost', label: 'هزینه' },
+  { key: 'errors', label: 'خطاها' },
+  { key: 'moderation', label: 'مدریشن' },
 ];
 
 export function AnalyticsPage() {
@@ -46,10 +47,10 @@ export function AnalyticsPage() {
   return (
     <div className="page">
       <div className="row">
-        <h1 className="page-title">📈 {t('analytics')}</h1>
+        <h1 className="page-title"><span className="title-icon"><Icon name="chart" size={20} /></span>{t('analytics')}</h1>
         <div className="spacer" />
-        <button className="btn sm" onClick={() => exportData('csv')}>⬇ CSV</button>
-        <button className="btn sm" onClick={() => exportData('json')}>⬇ JSON</button>
+        <button className="btn sm" onClick={() => exportData('csv')}><Icon name="download" size={13} /> CSV</button>
+        <button className="btn sm" onClick={() => exportData('json')}><Icon name="download" size={13} /> JSON</button>
       </div>
       <p className="page-subtitle">روند استفاده و سلامت پلتفرم — export شامل تمام رکوردهای usage است (spec §71)</p>
 
@@ -72,10 +73,10 @@ export function AnalyticsPage() {
       </div>
 
       <div className="grid grid-cards">
-        <MetricCard icon="🤖" label={t('ai_requests')} value={fmtNum(summary?.usage?.requests ?? 0)} />
-        <MetricCard icon="🎫" label={t('tokens')} value={fmtNum(Number(summary?.usage?.tokens_in ?? 0) + Number(summary?.usage?.tokens_out ?? 0))} />
-        <MetricCard icon="💰" label={t('cost')} value={`$${Number(summary?.usage?.cost ?? 0).toFixed(2)}`} />
-        <MetricCard icon="⚡" label={t('avg_latency')} value={`${fmtNum(summary?.usage?.avg_latency_ms ?? 0)} ms`} />
+        <MetricCard icon="bot" label={t('ai_requests')} value={fmtNum(summary?.usage?.requests ?? 0)} />
+        <MetricCard icon="zap" label={t('tokens')} value={fmtNum(Number(summary?.usage?.tokens_in ?? 0) + Number(summary?.usage?.tokens_out ?? 0))} />
+        <MetricCard icon="dollar" label={t('cost')} value={`$${Number(summary?.usage?.cost ?? 0).toFixed(2)}`} />
+        <MetricCard icon="clock" label={t('avg_latency')} value={`${fmtNum(summary?.usage?.avg_latency_ms ?? 0)} ms`} />
       </div>
     </div>
   );

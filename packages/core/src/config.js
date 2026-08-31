@@ -12,6 +12,10 @@ const schema = z.object({
   API_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
   API_HOST: z.string().default('0.0.0.0'),
   PUBLIC_BASE_URL: z.string().url().default('http://localhost:8080'),
+  // Comma-separated list of origins allowed to make credentialed cross-origin
+  // requests. Empty (default) = same-origin only, which is what the bundled
+  // panel needs. Never reflect arbitrary origins alongside credentials.
+  CORS_ORIGINS: z.string().default(''),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(200).default(10),

@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { fmtNum, t } from '../lib/i18n.js';
 import { Modal } from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
+import { Icon } from '../components/icons.jsx';
 
 /** Personality Studio: config panel + prompt editor + live test chat. */
 export function PersonalitiesPage() {
@@ -33,7 +34,7 @@ export function PersonalitiesPage() {
     setTgBusy(true);
     try {
       const result = await api('/settings/bot-token', { method: 'PUT', body: { token: tokenInput.trim() } });
-      toast(`✅ متصل شد: @${result.username} — ${result.note}`, 'success');
+      toast(`متصل شد: @${result.username} — ${result.note}`, 'success');
       setTokenInput('');
       setTg(await api('/settings/bot-token'));
     } catch (err) { toast(err.message, 'error'); }
@@ -111,14 +112,14 @@ export function PersonalitiesPage() {
       setChat((c) => [...c, { role: 'bot', content: result.content }]);
       setTimeout(() => logRef.current?.scrollTo({ top: 1e6 }), 30);
     } catch (err) {
-      setChat((c) => [...c, { role: 'bot', content: `⚠️ ${err.message}` }]);
+      setChat((c) => [...c, { role: 'bot', content: `خطا: ${err.message}` }]);
     } finally { setBusy(false); }
   };
 
   return (
     <div className="page">
       <div className="row">
-        <h1 className="page-title">🎭 {t('personalities')}</h1>
+        <h1 className="page-title"><span className="title-icon"><Icon name="mask" size={20} /></span>{t('personalities')}</h1>
         <div className="spacer" />
         <button className="btn primary" onClick={startCreate}>+ {t('add')}</button>
       </div>
@@ -127,7 +128,7 @@ export function PersonalitiesPage() {
       {/* Bot identity: the name users call in groups (spec §8) */}
       {identity && (
         <div className="card" style={{ marginBottom: 16, borderColor: 'var(--primary)' }}>
-          <div className="card-title">🏷️ هویت ربات — اسمی که در گروه صدایش می‌زنند</div>
+          <div className="card-title"><Icon name="mask" size={14} /> هویت ربات — اسمی که در گروه صدایش می‌زنند</div>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <div className="field" style={{ marginBottom: 0, width: 200 }}>
               <label>نام ربات</label>
@@ -137,7 +138,7 @@ export function PersonalitiesPage() {
               <label>بیو / معرفی کوتاه (اختیاری)</label>
               <input className="input" value={identity.bio ?? ''} onChange={(e) => setIdentity({ ...identity, bio: e.target.value })} />
             </div>
-            <button className="btn primary" onClick={saveIdentity} disabled={!(identity.name ?? '').trim()}>💾 ذخیره</button>
+            <button className="btn primary" onClick={saveIdentity} disabled={!(identity.name ?? '').trim()}><Icon name="save" size={13} /> ذخیره</button>
           </div>
           <span className="faint mt" style={{ fontSize: 11, display: 'inline-block' }}>
             بعد از ذخیره، هر کسی در گروه بنویسد «{identity.name} خوبی؟» ربات مستقیماً به همان فرد با ریپلای جواب می‌دهد.
@@ -148,7 +149,7 @@ export function PersonalitiesPage() {
       {/* Telegram connection: set/test the bot token from the panel */}
       <div className="card" style={{ marginBottom: 16, borderColor: tg.configured ? 'var(--success)' : 'var(--warning)' }}>
         <div className="card-title">
-          📡 اتصال تلگرام
+          <Icon name="globe" size={14} /> اتصال تلگرام
           {tg.configured
             ? <span className="badge success">متصل: @{tg.username ?? '?'} ({tg.masked})</span>
             : <span className="badge warning">تنظیم نشده</span>}
@@ -158,9 +159,9 @@ export function PersonalitiesPage() {
             placeholder="123456789:AAF3..." value={tokenInput}
             onChange={(e) => setTokenInput(e.target.value)} />
           <button className="btn primary" onClick={saveToken} disabled={tgBusy || !tokenInput.trim()}>
-            {tgBusy ? '…' : (tg.configured ? '🔄 تغییر توکن' : '🔌 اتصال بات')}
+            {tgBusy ? '…' : (tg.configured ? <><Icon name="refresh" size={13} />تغییر توکن</> : <><Icon name="plug" size={13} />اتصال بات</>)}
           </button>
-          {tg.configured && <button className="btn danger" onClick={removeToken}>🗑 حذف</button>}
+          {tg.configured && <button className="btn danger" onClick={removeToken}><Icon name="trash" size={13} /> حذف</button>}
         </div>
         <span className="faint mt" style={{ fontSize: 11, display: 'inline-block' }}>
           توکن را از @BotFather بگیرید. ذخیره = تست واقعی تلگرام + رمزنگاری AES-256. تغییر توکن تا ۱۵ ثانیه بعد خودکار روی بات اعمال می‌شود.
@@ -172,13 +173,13 @@ export function PersonalitiesPage() {
         {(rows ?? []).map((p) => (
           <div key={p.id} className="card">
             <div className="row">
-              <span style={{ fontSize: 22 }}>🎭</span>
+              <Icon name="mask" size={22} />
               <div>
                 <div style={{ fontWeight: 700 }}>{p.display_name}</div>
                 <div className="faint mono" style={{ fontSize: 11 }}>{p.slug} · v{p.current_version}</div>
               </div>
               <div className="spacer" />
-              <button className="btn sm" onClick={() => startEdit(p)}>✏️</button>
+              <button className="btn sm" onClick={() => startEdit(p)}><Icon name="edit" size={13} /></button>
             </div>
             <p className="muted mt" style={{ fontSize: 12, minHeight: 32 }}>{p.description || '—'}</p>
             <div className="row" style={{ fontSize: 11 }}>
@@ -189,7 +190,7 @@ export function PersonalitiesPage() {
         ))}
         {rows && rows.length === 0 && (
           <div className="card"><div className="empty">
-            <div className="empty-icon">🎭</div>
+            <div className="empty-icon"><Icon name="mask" size={24} /></div>
             <div className="empty-title">هیچ شخصیتی ساخته نشده است</div>
             <button className="btn primary mt" onClick={startCreate}>+ ساخت شخصیت</button>
           </div></div>
@@ -197,7 +198,7 @@ export function PersonalitiesPage() {
       </div>
 
       {editing && form && (
-        <Modal title={editing.id ? `🎭 ${form.display_name}` : 'شخصیت جدید'} onClose={() => setEditing(null)} wide>
+        <Modal title={editing.id ? `${form.display_name}` : 'شخصیت جدید'} onClose={() => setEditing(null)} wide>
           <div className="studio">
             {/* Left: configuration */}
             <div>
@@ -232,7 +233,7 @@ export function PersonalitiesPage() {
 
             {/* Right: live test chat */}
             <div className="card chat-panel">
-              <div className="card-title">🧪 تست زنده</div>
+              <div className="card-title"><Icon name="activity" size={14} /> تست زنده</div>
               <div className="chat-log" ref={logRef}>
                 {chat.length === 0 && <div className="muted" style={{ fontSize: 12 }}>پیامی بفرستید تا پاسخ این شخصیت را ببینید.</div>}
                 {chat.map((m, i) => (
@@ -244,7 +245,7 @@ export function PersonalitiesPage() {
                 <input className="input" placeholder="مثلاً: تو کی هستی؟" value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && sendTest()} />
-                <button className="btn primary" onClick={sendTest} disabled={busy}>➤</button>
+                <button className="btn primary" onClick={sendTest} disabled={busy}><Icon name="send" size={14} /></button>
               </div>
             </div>
           </div>

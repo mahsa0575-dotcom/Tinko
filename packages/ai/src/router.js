@@ -17,11 +17,29 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
   const breaker = new CircuitBreaker();
   const adapters = new Map();
 
-  function getAdapter(providerRow) {
-    if (!adapters.has(providerRow.id)) {
-      adapters.set(providerRow.id, createAdapter(providerRow, { logger }));
+  /**
+   * Adapters are per-PROVIDER, but `allActiveModels()` hands us model rows with
+   * the provider columns joined in under aliases (provider_kind / provider_slug /
+   * provider_config). Project them back into a provider-shaped row before
+   * constructing the adapter — passing the model row straight through left
+   * `kind` undefined and made every request fail with "Unknown provider kind".
+   */
+  function getAdapter(modelRow) {
+    const providerId = modelRow.provider_id;
+    if (!adapters.has(providerId)) {
+      const providerRow = {
+        id: providerId,
+        slug: modelRow.provider_slug,
+        kind: modelRow.provider_kind,
+        health: modelRow.provider_health,
+        config: modelRow.provider_config,
+        base_url: modelRow.base_url,
+        timeout_ms: modelRow.timeout_ms,
+        max_retries: modelRow.max_retries,
+      };
+      adapters.set(providerId, createAdapter(providerRow, { logger }));
     }
-    return adapters.get(providerRow.id);
+    return adapters.get(providerId);
   }
 
   /**
@@ -103,7 +121,7 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
       const started = Date.now();
       try {
         const result = await adapter.chat(
-          { messages: req.messages, temperature: req.temperature, maxTokens: req.maxTokens, tools: req.tools },
+          { model: model.identifier, messages: req.messages, temperature: req.temperature, maxTokens: req.maxTokens, tools: req.tools },
           { apiKey: keySecret.secret, signal: opts.signal, userId: opts.userId, groupId: opts.groupId, conversationId: opts.conversationId, language: opts.language ?? 'fa' });
         const latencyMs = Date.now() - started;
         breaker.recordSuccess(key);

@@ -1,69 +1,98 @@
 // ============================================================
 // BotAI Design System — tokens
-// Premium blue identity. Dark is the primary enterprise theme;
-// light mode is designed independently (not an inversion).
+// Premium "deep space + electric indigo" identity.
+// Dark is the primary enterprise theme; light mode is designed
+// independently (not an inversion). All colors are semantic.
 // ============================================================
 
 :root, [data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #0b1220;
-  --bg-glow: radial-gradient(1200px 500px at 85% -10%, rgba(37, 99, 235, .14), transparent 60%);
-  --surface: #101a2e;
-  --surface-2: #14213a;
-  --surface-3: #1a2a4a;
-  --border: #1f2f4f;
-  --border-strong: #2b3f66;
+  --bg: #070b14;
+  --bg-glow:
+    radial-gradient(1100px 520px at 88% -12%, rgba(99, 102, 241, .13), transparent 62%),
+    radial-gradient(900px 480px at -8% 108%, rgba(14, 165, 233, .09), transparent 58%),
+    radial-gradient(620px 340px at 50% 0%, rgba(139, 92, 246, .05), transparent 70%);
+  --surface: #0d1424;
+  --surface-2: #111a2e;
+  --surface-3: #17233c;
+  --surface-hover: #1a2743;
+  --border: #1d2a45;
+  --border-strong: #2c3d61;
 
-  --text: #e7edf7;
-  --text-muted: #8fa3c0;
-  --text-faint: #5d7091;
+  --text: #e9eefb;
+  --text-muted: #93a3c4;
+  --text-faint: #5c6f93;
 
-  --primary: #2563eb;
-  --primary-hover: #3b82f6;
-  --primary-soft: rgba(37, 99, 235, .16);
+  --primary: #6366f1;
+  --primary-hover: #7c7df5;
+  --primary-soft: rgba(99, 102, 241, .14);
+  --primary-glow: rgba(99, 102, 241, .4);
   --primary-contrast: #ffffff;
+  --accent: #22d3ee;
+  --accent-soft: rgba(34, 211, 238, .12);
+  --brand-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #22d3ee 115%);
 
-  --success: #22c55e; --success-soft: rgba(34, 197, 94, .14);
-  --warning: #f59e0b; --warning-soft: rgba(245, 158, 11, .14);
-  --danger:  #ef4444; --danger-soft:  rgba(239, 68, 68, .14);
-  --info:    #38bdf8; --info-soft:    rgba(56, 189, 248, .14);
+  --success: #34d399; --success-soft: rgba(52, 211, 153, .13);
+  --warning: #fbbf24; --warning-soft: rgba(251, 191, 36, .13);
+  --danger:  #f87171; --danger-soft:  rgba(248, 113, 113, .13);
+  --info:    #38bdf8; --info-soft:    rgba(56, 189, 248, .13);
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
-  --shadow-2: 0 8px 30px rgba(0, 0, 0, .45);
-  --ring: 0 0 0 3px rgba(59, 130, 246, .35);
+  --shadow-1: 0 1px 2px rgba(1, 4, 12, .5);
+  --shadow-2: 0 10px 34px rgba(1, 4, 12, .55), 0 2px 8px rgba(1, 4, 12, .35);
+  --shadow-3: 0 22px 60px rgba(1, 4, 12, .62), 0 4px 14px rgba(1, 4, 12, .4);
+  --ring: 0 0 0 3px rgba(99, 102, 241, .3);
+  --glass: rgba(13, 20, 36, .78);
+  --ease: cubic-bezier(.22, .8, .32, 1);
 }
 
 [data-theme='light'] {
   color-scheme: light;
 
-  --bg: #f4f6fb;
-  --bg-glow: radial-gradient(1200px 500px at 85% -10%, rgba(37, 99, 235, .07), transparent 60%);
+  --bg: #f3f5fc;
+  --bg-glow:
+    radial-gradient(1100px 520px at 88% -12%, rgba(99, 102, 241, .09), transparent 62%),
+    radial-gradient(900px 480px at -8% 108%, rgba(14, 165, 233, .07), transparent 58%);
   --surface: #ffffff;
-  --surface-2: #f7f9fd;
-  --surface-3: #eef2fa;
-  --border: #e3e9f4;
-  --border-strong: #cbd6ea;
+  --surface-2: #f6f8fe;
+  --surface-3: #eef1fb;
+  --surface-hover: #e8edf9;
+  --border: #e2e8f6;
+  --border-strong: #c8d2ea;
 
-  --text: #101828;
-  --text-muted: #5a6b85;
-  --text-faint: #94a3b8;
+  --text: #131a2c;
+  --text-muted: #5b6a88;
+  --text-faint: #98a4bd;
 
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-soft: rgba(37, 99, 235, .09);
+  --primary: #5155e8;
+  --primary-hover: #4346d6;
+  --primary-soft: rgba(81, 85, 232, .09);
+  --primary-glow: rgba(81, 85, 232, .28);
   --primary-contrast: #ffffff;
+  --accent: #0891b2;
+  --accent-soft: rgba(8, 145, 178, .09);
+  --brand-gradient: linear-gradient(135deg, #5155e8 0%, #7c5cf0 50%, #0891b2 115%);
 
-  --success: #16a34a; --success-soft: rgba(22, 163, 74, .1);
-  --warning: #d97706; --warning-soft: rgba(217, 119, 6, .1);
-  --danger:  #dc2626; --danger-soft:  rgba(220, 38, 38, .1);
-  --info:    #0284c7; --info-soft:    rgba(2, 132, 199, .1);
+  --success: #0f9d6a; --success-soft: rgba(15, 157, 106, .1);
+  --warning: #c07a04; --warning-soft: rgba(192, 122, 4, .1);
+  --danger:  #dc3d43; --danger-soft:  rgba(220, 61, 67, .09);
+  --info:    #0369a1; --info-soft:    rgba(3, 105, 161, .09);
 
-  --shadow-1: 0 1px 2px rgba(16, 24, 40, .06);
-  --shadow-2: 0 8px 30px rgba(16, 24, 40, .1);
-  --ring: 0 0 0 3px rgba(37, 99, 235, .25);
+  --shadow-1: 0 1px 2px rgba(19, 26, 44, .07);
+  --shadow-2: 0 10px 30px rgba(19, 26, 44, .1), 0 2px 6px rgba(19, 26, 44, .06);
+  --shadow-3: 0 22px 56px rgba(19, 26, 44, .14), 0 4px 12px rgba(19, 26, 44, .08);
+  --ring: 0 0 0 3px rgba(81, 85, 232, .22);
+  --glass: rgba(255, 255, 255, .8);
+  --ease: cubic-bezier(.22, .8, .32, 1);
 }
 
 // Direction-aware helpers (RTL is the default; LTR mirrors everything)
 :root { --dir: rtl; --flip: -1; }
 [data-dir='ltr'] { --dir: ltr; --flip: 1; }
+
+// Standard motion durations
+:root {
+  --t-fast: .16s;
+  --t-med: .28s;
+  --t-slow: .45s;
+}

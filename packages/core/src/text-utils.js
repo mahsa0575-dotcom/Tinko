@@ -18,8 +18,21 @@ export function cleanSnippet(html, maxLen = 1500) {
 
 /** Restricted arithmetic evaluator — no Function/eval, numbers+operators only. */
 export function evaluateArithmetic(input) {
-  const tokens = String(input).match(/(\d+\.?\d*|[+\-*/()%])/g);
-  if (!tokens) throw new Error('empty expression');
+  const src = String(input).trim();
+  // Tokenize strictly: anything that is not a number, operator, paren or space
+  // is a hard error. Matching loosely and discarding the rest would silently
+  // turn "process.exit(1)" into "(1)" and happily return 1.
+  const tokens = [];
+  const re = /\s*(\d+\.?\d*|[+\-*/()%])/y;
+  let i = 0;
+  while (i < src.length) {
+    re.lastIndex = i;
+    const m = re.exec(src);
+    if (!m) throw new Error(`invalid character at position ${i}: ${src[i]}`);
+    tokens.push(m[1]);
+    i = re.lastIndex;
+  }
+  if (!tokens.length) throw new Error('empty expression');
   let pos = 0;
   const peek = () => tokens[pos];
   const next = () => tokens[pos++];
@@ -42,8 +55,15 @@ export function evaluateArithmetic(input) {
     return v;
   }
   function parseFactor() {
-    if (peek() === '(') { next(); const v = parseExpr(); if (peek() === ')') next(); return v; }
+    if (peek() === '(') {
+      next();
+      const v = parseExpr();
+      if (peek() !== ')') throw new Error('unbalanced parentheses');
+      next();
+      return v;
+    }
     if (peek() === '-') { next(); return -parseFactor(); }
+    if (peek() === '+') { next(); return parseFactor(); }
     const tok = next();
     const n = Number(tok);
     if (!Number.isFinite(n)) throw new Error(`invalid token: ${tok}`);
@@ -51,5 +71,6 @@ export function evaluateArithmetic(input) {
   }
   const result = parseExpr();
   if (pos < tokens.length) throw new Error(`unexpected token: ${tokens[pos]}`);
+  if (!Number.isFinite(result)) throw new Error('result is not a finite number');
   return result;
 }

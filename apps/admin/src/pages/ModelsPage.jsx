@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { fmtNum, fmtBytes, t } from '../lib/i18n.js';
 import { DataTable, Modal, StatusBadge, MetricCard } from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
+import { Icon } from '../components/icons.jsx';
 
 /** Model registry + logical profile mapping. */
 export function ModelsPage() {
@@ -64,12 +65,12 @@ export function ModelsPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">🧩 {t('models')}</h1>
+      <h1 className="page-title"><span className="title-icon"><Icon name="models" size={20} /></span>{t('models')}</h1>
       <p className="page-subtitle">مدل‌های واقعی + پروفایل‌های منطقی (گروه‌ها «Smart» را انتخاب می‌کنند، نه نام پرووایدر)</p>
 
       <div className="row" style={{ marginBottom: 14 }}>
         <button className="btn primary" onClick={startAddModel}>+ ثبت مدل</button>
-        <button className="btn" onClick={runRouteDebug}>🔍 دیباگر روتینگ</button>
+        <button className="btn" onClick={runRouteDebug}><Icon name="search" size={13} /> دیباگر روتینگ</button>
       </div>
 
       <DataTable loading={!models} rows={models} emptyText="هیچ مدلی ثبت نشده است"
@@ -89,15 +90,15 @@ export function ModelsPage() {
         ]}
       />
 
-      <h2 style={{ fontSize: 17, margin: '26px 0 12px' }}>🎯 پروفایل‌های منطقی</h2>
+      <h2 style={{ fontSize: 17, margin: '26px 0 12px' }}><Icon name="models" size={16} /> پروفایل‌های منطقی</h2>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
         {(profiles ?? []).map((p) => (
           <div key={p.id} className="card">
             <div className="row">
-              <span style={{ fontSize: 20 }}>🎯</span>
+              <Icon name="models" size={20} />
               <div style={{ fontWeight: 700 }}>{p.name}</div>
               <div className="spacer" />
-              <button className="btn sm" onClick={() => editProfile(p)}>✏️</button>
+              <button className="btn sm" onClick={() => editProfile(p)}><Icon name="edit" size={13} /></button>
             </div>
             <div className="muted mono mt" style={{ fontSize: 11 }}>
               {(p.models ?? []).filter((m) => m.model_id).map((m, i) => `${i === 0 ? '' : ' → '}${providerName(m.model_id)}`)}{' '}
@@ -108,7 +109,7 @@ export function ModelsPage() {
       </div>
 
       {routeDebug && (
-        <Modal title="🔍 دیباگر روتینگ (spec §119)" onClose={() => setRouteDebug(null)} wide>
+        <Modal title="دیباگر روتینگ (spec §119)" onClose={() => setRouteDebug(null)} wide>
           <p className="muted" style={{ fontSize: 12 }}>پروفایل: {routeDebug.profileKey}</p>
           {routeDebug.chain.map((c) => (
             <div key={c.position} className="row" style={{ justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -156,7 +157,7 @@ export function ModelsPage() {
       )}
 
       {editingProfile && (
-        <Modal title={`🎯 ${profileForm.name}`} onClose={() => setEditingProfile(null)}>
+        <Modal title={`${profileForm.name}`} onClose={() => setEditingProfile(null)}>
           <p className="muted" style={{ fontSize: 12 }}>
             ترتیب انتخاب = ترتیب fallback. اولی «اصلی» و بقیه جایگزین هستند.
           </p>
@@ -171,7 +172,7 @@ export function ModelsPage() {
                   })}>
                   {(models ?? []).map((m) => <option key={m.id} value={m.id}>{m.provider_slug} / {m.display_name}</option>)}
                 </select>
-                <button className="btn sm ghost" onClick={() => setProfileForm({ ...profileForm, models: profileForm.models.filter((_, j) => j !== i) })}>✕</button>
+                <button className="btn sm ghost" onClick={() => setProfileForm({ ...profileForm, models: profileForm.models.filter((_, j) => j !== i) })}><Icon name="x" size={13} /></button>
               </div>
             ))}
             <button className="btn sm mt" onClick={() => setProfileForm({ ...profileForm, models: [...profileForm.models, models?.[0]?.id] })}>+ افزودن مدل</button>

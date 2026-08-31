@@ -36,7 +36,7 @@ export function ModerationPage() {
   return (
     <div className="page">
       <div className="row">
-        <h1 className="page-title">🛡️ {t('moderation')}</h1>
+        <h1 className="page-title"><span className="title-icon"><Icon name="shield" size={20} /></span>{t('moderation')}</h1>
         <div className="spacer" />
         <button className="btn primary" onClick={startRule}>+ قانون جدید</button>
       </div>

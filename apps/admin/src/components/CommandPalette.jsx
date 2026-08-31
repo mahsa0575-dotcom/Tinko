@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { t } from '../lib/i18n.js';
+import { Icon } from './icons.jsx';
 
 /** Ctrl+K command palette: navigate, search, toggle theme. */
 export function CommandPalette({ open, onClose, commands }) {
@@ -39,8 +40,8 @@ export function CommandPalette({ open, onClose, commands }) {
         {filtered.map((cmd, i) => (
           <div key={cmd.label} className={`cmdk-item${i === selected ? ' selected' : ''}`}
             onMouseEnter={() => setSelected(i)} onClick={() => run(cmd)}>
-            <span>{cmd.icon}</span><span>{cmd.label}</span>
-            {cmd.hint && <span className="cmdk-hint">{cmd.hint}</span>}
+            <Icon name={cmd.icon} size={16} /><span>{cmd.label}</span>
+            {cmd.hint && cmd.hint !== cmd.label && <span className="cmdk-hint">{cmd.hint}</span>}
           </div>
         ))}
         {filtered.length === 0 && <div className="cmdk-item muted">{t('no_data')}</div>}
