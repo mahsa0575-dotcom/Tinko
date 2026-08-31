@@ -163,7 +163,7 @@ export function createAiConfigRepo(pool, { encrypt, decrypt, mask }) {
         client.release();
       }
     },
-    updatePersonality: async (tenantId, id, patch, authorId = null) => {
+    updatePersonality: async (tenantId, id, patch, authorId = null, summary = null) => {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -182,7 +182,7 @@ export function createAiConfigRepo(pool, { encrypt, decrypt, mask }) {
         await client.query(
           `INSERT INTO personality_versions (personality_id, version, author_id, summary, snapshot)
            VALUES ($1,$2,$3,$4,$5)`,
-          [id, version, authorId, patch.__summary ?? 'update', JSON.stringify(rows[0])]);
+          [id, version, authorId, summary ?? 'update', JSON.stringify(rows[0])]);
         await client.query('COMMIT');
         return rows[0];
       } catch (err) {

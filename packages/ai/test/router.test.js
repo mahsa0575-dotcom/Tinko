@@ -81,6 +81,28 @@ describe('AI router', () => {
       .rejects.toThrow(/هیچ مدل در دسترسی/);
   });
 
+  it('accepts a plain messages array as the first argument (regression)', async () => {
+    // Several callers (memory extraction, ai-moderation, tool loop, test-chat)
+    // pass an array, not a { messages } object. The router must normalize it.
+    const repos = makeRepos();
+    const router = createAiRouter({ aiConfigRepo: repos.aiConfig, opsRepo: repos.ops, logger: quiet() });
+    const result = await router.chat(
+      [{ role: 'user', content: 'سلام' }],
+      { tenantId: 1, profileKey: 'balanced' });
+    expect(result.content).toContain('[mock:mock-model]');
+    expect(result.content).toContain('سلام');
+  });
+
+  it('testProvider builds an adapter from a provider row (regression)', async () => {
+    // testProvider receives a real `providers` row (kind/slug/config directly),
+    // NOT a model row. It must not route through getAdapter() (which expects
+    // provider_id/provider_kind) or every admin "Test connection" 500s.
+    const repos = makeRepos();
+    const router = createAiRouter({ aiConfigRepo: repos.aiConfig, opsRepo: repos.ops, logger: quiet() });
+    const result = await router.testProvider(makeProviderRow({ kind: 'mock' }), 'sk-1');
+    expect(result.ok).toBe(true);
+  });
+
   it('filters by required capabilities (vision routing)', async () => {
     const textModel = makeModelRow({ id: 10, capabilities: ['chat'] });
     const visionModel = makeModelRow({ id: 20, capabilities: ['chat', 'vision'] });

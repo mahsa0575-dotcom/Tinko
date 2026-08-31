@@ -192,6 +192,9 @@ export async function startBot(overrides = {}) {
   const pipeline = createPipeline([
     dedupeStage(redis),
     resolutionStage(repos),
+    // Keyword automations need pctx.group, which resolutionStage sets — so this
+    // runs as a stage, not before the pipeline (where group was still undefined).
+    async function messageAutomations(pctx) { await runMessageAutomations(pctx); },
     rateLimitStage(redis),
     mediaStage({ router }),
     moderationStage({ repos, profanity }),
@@ -257,7 +260,8 @@ export async function startBot(overrides = {}) {
       downloadFile: async (fileId) => {
         const file = await ctx.api.getFile(fileId);
         if ((file.file_size ?? 0) > 20 * 1024 * 1024) throw new Error('file too large');
-        const url = `https://api.telegram.org/file/bot${config.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+        // Use the ACTIVE bot token (panel-resolved), not the env one — they can differ.
+        const url = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
         const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
         if (!res.ok) throw new Error(`file download failed: HTTP ${res.status}`);
         return Buffer.from(await res.arrayBuffer()).toString('base64');
@@ -268,7 +272,6 @@ export async function startBot(overrides = {}) {
       banMember: () => ctx.banChatMember(ctx.from.id),
       streamingEnabled: true,
     };
-    await runMessageAutomations(pctx); // keyword automations (spec §74)
     await pipeline(pctx);
   });
 

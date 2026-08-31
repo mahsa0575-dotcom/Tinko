@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { fmtNum, t } from '../lib/i18n.js';
 import { MetricCard, Chart, StatusBadge, PageHeader } from '../components/ui.jsx';
+import { Icon } from '../components/icons.jsx';
 import { useStore } from '../state/store.jsx';
 
 export function DashboardPage() {

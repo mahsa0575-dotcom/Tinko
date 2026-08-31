@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { fmtNum, fmtTime, t } from '../lib/i18n.js';
-import { DataTable, StatusBadge } from '../components/ui.jsx';
+import { DataTable, StatusBadge, Modal } from '../components/ui.jsx';
 import { Tabs } from '../components/tabs-extra.jsx';
+import { Icon } from '../components/icons.jsx';
 import { useStore } from '../state/store.jsx';
 
 export function ModerationPage() {

@@ -57,23 +57,41 @@ export async function runCleanup(ctx) {
 /** 1-minute aggregation of raw metrics into resource_aggregates. */
 export async function runMetricsAggregation(ctx) {
   const { pool } = ctx;
+  // Scalar metrics aggregate straight off resource_metrics; the jsonb arrays
+  // (disks, net) are expanded in their OWN lateral subqueries so they never
+  // cross-multiply each other. jsonb fields are read with ->> (not .field).
   await pool.query(`
-    INSERT INTO resource_aggregates (bucket_start, resolution, cpu_avg, cpu_max, mem_avg, mem_max, swap_avg, disk_pct, net_rx, net_tx, load_avg)
-    SELECT date_trunc('minute', captured_at) AS bucket, '1m',
-           avg(cpu_percent), max(cpu_percent),
-           round(avg(mem_used))::bigint, max(mem_used),
-           round(avg(swap_used))::bigint,
-           jsonb_object_agg(d.mount, d.pct)::jsonb,
-           round(sum(n.rx_bps))::bigint, round(sum(n.tx_bps))::bigint,
-           avg(load_avg[1])
-    FROM (
-      SELECT captured_at, cpu_percent, mem_used, swap_used, load_avg,
-             (SELECT jsonb_array_elements(disks) AS d) ,
-             (SELECT jsonb_array_elements(COALESCE(net, '[]'::jsonb)) AS n)
+    WITH per_minute AS (
+      SELECT date_trunc('minute', captured_at) AS bucket,
+             avg(cpu_percent) AS cpu_avg, max(cpu_percent) AS cpu_max,
+             round(avg(mem_used))::bigint AS mem_avg, max(mem_used) AS mem_max,
+             round(avg(swap_used))::bigint AS swap_avg,
+             avg(load_avg[1]) AS load_avg
       FROM resource_metrics
       WHERE captured_at >= now() - interval '2 minutes'
-    ) t
-    GROUP BY bucket
+      GROUP BY 1
+    ),
+    disk_agg AS (
+      SELECT date_trunc('minute', m.captured_at) AS bucket,
+             jsonb_object_agg(d->>'mount', (d->>'pct')::numeric) AS disk_pct
+      FROM resource_metrics m, jsonb_array_elements(COALESCE(m.disks, '[]'::jsonb)) AS d
+      WHERE m.captured_at >= now() - interval '2 minutes'
+      GROUP BY 1
+    ),
+    net_agg AS (
+      SELECT date_trunc('minute', m.captured_at) AS bucket,
+             round(sum((n->>'rx_bps')::numeric))::bigint AS net_rx,
+             round(sum((n->>'tx_bps')::numeric))::bigint AS net_tx
+      FROM resource_metrics m, jsonb_array_elements(COALESCE(m.net, '[]'::jsonb)) AS n
+      WHERE m.captured_at >= now() - interval '2 minutes'
+      GROUP BY 1
+    )
+    INSERT INTO resource_aggregates (bucket_start, resolution, cpu_avg, cpu_max, mem_avg, mem_max, swap_avg, disk_pct, net_rx, net_tx, load_avg)
+    SELECT pm.bucket, '1m', pm.cpu_avg, pm.cpu_max, pm.mem_avg, pm.mem_max, pm.swap_avg,
+           da.disk_pct, na.net_rx, na.net_tx, pm.load_avg
+    FROM per_minute pm
+    LEFT JOIN disk_agg da ON da.bucket = pm.bucket
+    LEFT JOIN net_agg na ON na.bucket = pm.bucket
     ON CONFLICT (resolution, bucket_start) DO UPDATE SET
       cpu_avg = EXCLUDED.cpu_avg, cpu_max = EXCLUDED.cpu_max,
       mem_avg = EXCLUDED.mem_avg, mem_max = EXCLUDED.mem_max,

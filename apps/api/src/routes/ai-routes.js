@@ -95,7 +95,7 @@ export async function registerAiRoutes(fastify, { ctx }) {
     const before = await repos.aiConfig.getPersonality(1, req.params.id);
     if (!before) throw Errors.notFound('Personality');
     const { __summary, ...patch } = req.body ?? {};
-    const updated = await repos.aiConfig.updatePersonality(1, req.params.id, patch, req.admin.id);
+    const updated = await repos.aiConfig.updatePersonality(1, req.params.id, patch, req.admin.id, __summary);
     await repos.ops.audit({ tenantId: 1, actorId: req.admin.id, action: 'personality.updated', entityType: 'personality', entityId: Number(req.params.id), before: { system_prompt: before.system_prompt }, after: { system_prompt: updated.system_prompt }, requestId: req.id });
     return updated;
   });

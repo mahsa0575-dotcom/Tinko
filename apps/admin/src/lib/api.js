@@ -23,7 +23,11 @@ async function refresh() {
   return refreshing;
 }
 
-export async function api(path, { method = 'GET', body } = {}) {
+/**
+ * Perform an authenticated request with automatic token refresh on 401.
+ * Returns the raw Response so callers can read JSON, text, CSV, blobs, etc.
+ */
+export async function apiRaw(path, { method = 'GET', body } = {}) {
   const doFetch = () => fetch(`/api/v1${path}`, {
     method,
     headers: {
@@ -44,6 +48,11 @@ export async function api(path, { method = 'GET', body } = {}) {
       throw new Error('نشست شما منقضی شده است. دوباره وارد شوید.');
     }
   }
+  return res;
+}
+
+export async function api(path, { method = 'GET', body } = {}) {
+  const res = await apiRaw(path, { method, body });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data?.error?.message ?? `Request failed (${res.status})`);

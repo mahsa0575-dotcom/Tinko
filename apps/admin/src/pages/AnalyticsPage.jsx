@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api.js';
+import { api, apiRaw } from '../lib/api.js';
 import { fmtNum, t } from '../lib/i18n.js';
 import { MetricCard, Chart } from '../components/ui.jsx';
 import { useStore } from '../state/store.jsx';
@@ -30,10 +30,14 @@ export function AnalyticsPage() {
 
   const exportData = async (format) => {
     try {
-      const data = await api(`/analytics/export?format=${format}&hours=${hours}`);
-      const blob = format === 'json'
-        ? new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-        : new Blob([data], { type: 'text/csv;charset=utf-8' });
+      const res = await apiRaw(`/analytics/export?format=${format}&hours=${hours}`);
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      // CSV is text/csv and JSON is application/json — read the raw body, never
+      // force res.json() (that would corrupt the CSV into "[object Object]").
+      const text = await res.text();
+      const blob = new Blob([text], {
+        type: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8',
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

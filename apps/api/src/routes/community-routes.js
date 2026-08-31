@@ -1,3 +1,5 @@
+import { Errors } from '@botai/core';
+
 /** Community routes: groups, users, memories, blacklists, moderation. */
 export async function registerCommunityRoutes(fastify, { ctx }) {
   const { repos } = ctx;
@@ -40,7 +42,7 @@ export async function registerCommunityRoutes(fastify, { ctx }) {
     let cond = 'tenant_id = $1';
     if (search) {
       params.push(`%${search}%`);
-      cond += ` AND (username ILIKE $${params.length} OR first_name ILIKE $${params.length} OR telegram_id::text = $${params.length})`;
+      cond += ` AND (username ILIKE $${params.length} OR first_name ILIKE $${params.length} OR telegram_id::text ILIKE $${params.length})`;
     }
     return (await ctx.pool.query(
       `SELECT u.id, u.telegram_id, u.username, u.first_name, u.last_name, u.language_code,

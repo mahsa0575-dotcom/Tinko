@@ -83,6 +83,8 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
    * @returns {Promise<{content, usage, finishReason, routed:{modelId, providerId, profileKey, attempts[], aiRequestId}, latencyMs}>}
    */
   async function chat(req, opts) {
+    // Callers may pass either a plain messages array or a { messages, ... } object.
+    if (Array.isArray(req)) req = { messages: req };
     const aiRequestId = newAiRequestId();
     const attempts = [];
     // Tool calls need providers with the `tools` capability (spec §61–62).
@@ -169,6 +171,7 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
    * @returns {Promise<{content, usage, finishReason, routed, latencyMs}>}
    */
   async function chatStream(req, opts) {
+    if (Array.isArray(req)) req = { messages: req };
     const aiRequestId = newAiRequestId();
     const requireCaps = [...(opts.require ?? [])];
     if (req.tools?.length) requireCaps.push('tools');
@@ -193,7 +196,7 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
       let content = '';
       try {
         for await (const delta of adapter.chatStream(
-          { messages: req.messages, temperature: req.temperature, maxTokens: req.maxTokens },
+          { model: model.identifier, messages: req.messages, temperature: req.temperature, maxTokens: req.maxTokens },
           { apiKey: keySecret.secret, signal: opts.signal })) {
           content += delta;
           opts.onDelta?.(delta, content);
@@ -201,12 +204,20 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
         const latencyMs = Date.now() - started;
         breaker.recordSuccess(key);
         opts.onDelta?.('', content, true); // final signal
+        const usage = {
+          inputTokens: Math.ceil(JSON.stringify(req.messages).length / 4),
+          outputTokens: Math.ceil(content.length / 4),
+        };
+        await opsRepo?.recordUsage({
+          tenantId: opts.tenantId, groupId: opts.groupId ?? null, userId: opts.userId ?? null,
+          providerId: model.provider_id, modelId: model.id, personalityId: opts.personalityId ?? null,
+          requestKind: opts.requestKind ?? 'chat',
+          tokensIn: usage.inputTokens, tokensOut: usage.outputTokens,
+          latencyMs, status: 'success', aiRequestId,
+        });
         return {
           content,
-          usage: {
-            inputTokens: Math.ceil(JSON.stringify(req.messages).length / 4),
-            outputTokens: Math.ceil(content.length / 4),
-          },
+          usage,
           finishReason: 'stop',
           routed: { aiRequestId, modelId: model.id, providerId: model.provider_id, streaming: true, attempts: [], fallbackUsed: false },
           latencyMs,
@@ -243,9 +254,11 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
   }
 
   /** Provider health probe (used by worker + admin test button). */
-  async function testProvider(providerRow, apiKey) {
-    const adapter = getAdapter(providerRow);
-    return adapter.healthCheck({ apiKey, model: providerRow.config?.healthModel });
+  async function testProvider(providerRow, apiKey, model) {
+    // providerRow is a real `providers` row (kind/slug/config directly), NOT a
+    // model row — so build the adapter straight from it, bypassing getAdapter().
+    const adapter = createAdapter(providerRow, { logger });
+    return adapter.healthCheck({ apiKey, model: model ?? providerRow.config?.healthModel });
   }
 
   /**

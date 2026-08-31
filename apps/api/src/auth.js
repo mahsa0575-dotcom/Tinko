@@ -86,8 +86,13 @@ async function authRoutes(fastify, { ctx }) {
       expiresAt: new Date(Date.now() + REFRESH_TTL_S * 1000),
     });
     const accessToken = signAccess({ sub: admin.id, sid: sessionId, exp: Math.floor(Date.now() / 1000) + ACCESS_TTL_S }, config.SESSION_SECRET);
+    // Secure cookie only when the panel is actually served over HTTPS. A
+    // production deployment behind plain HTTP (e.g. http://ip:9053) must NOT
+    // set Secure, or the browser drops the refresh cookie and the session
+    // silently dies when the 15-minute access token expires.
+    const cookieSecure = /^https:/i.test(config.PUBLIC_BASE_URL ?? '');
     reply.setCookie('botai_refresh', refreshToken, {
-      httpOnly: true, sameSite: 'strict', secure: config.NODE_ENV === 'production',
+      httpOnly: true, sameSite: 'strict', secure: cookieSecure,
       path: '/api/v1/auth', maxAge: REFRESH_TTL_S,
     });
     return { accessToken, expiresIn: ACCESS_TTL_S, sessionId };
@@ -116,7 +121,7 @@ async function authRoutes(fastify, { ctx }) {
       const existing = await repos.admin.byEmail(1, email);
       if (existing) {
         await repos.admin.recordFailedLogin(existing.id);
-        await repos.ops.audit({ tenantId: 1, actorId: existing.id, action: 'auth.login_failed', request_id: req.id, ip: req.ip });
+        await repos.ops.audit({ tenantId: 1, actorId: existing.id, action: 'auth.login_failed', requestId: req.id, ip: req.ip });
       }
       throw Errors.unauthorized('Invalid email or password');
     }
@@ -131,14 +136,14 @@ async function authRoutes(fastify, { ctx }) {
           `UPDATE admin_users SET recovery_codes = array_remove(recovery_codes, $2)
            WHERE id = $1 AND $2 = ANY(recovery_codes)`, [admin.id, hash]);
         if (rowCount === 0) {
-          await repos.ops.audit({ tenantId: 1, actorId: admin.id, action: 'auth.totp_failed', request_id: req.id, ip: req.ip });
+          await repos.ops.audit({ tenantId: 1, actorId: admin.id, action: 'auth.totp_failed', requestId: req.id, ip: req.ip });
           throw Errors.unauthorized('کد دو مرحله‌ای نامعتبر است');
         }
-        await repos.ops.audit({ tenantId: 1, actorId: admin.id, action: 'auth.recovery_code_used', request_id: req.id, ip: req.ip });
+        await repos.ops.audit({ tenantId: 1, actorId: admin.id, action: 'auth.recovery_code_used', requestId: req.id, ip: req.ip });
       }
     }
     const session = await issueSession(req, admin, reply);
-    await repos.ops.audit({ tenantId: admin.tenant_id, actorId: admin.id, action: 'auth.login', request_id: req.id, ip: req.ip });
+    await repos.ops.audit({ tenantId: admin.tenant_id, actorId: admin.id, action: 'auth.login', requestId: req.id, ip: req.ip });
     return { accessToken: session.accessToken, expiresIn: session.expiresIn };
   });
 
@@ -166,7 +171,7 @@ async function authRoutes(fastify, { ctx }) {
     await ctx.pool.query(
       `UPDATE admin_users SET totp_enabled = true, recovery_codes = $2 WHERE id = $1`,
       [admin.id, hashes]);
-    await repos.ops.audit({ tenantId: 1, actorId: admin.id, action: 'auth.2fa_enabled', request_id: req.id, ip: req.ip });
+    await repos.ops.audit({ tenantId: 1, actorId: admin.id, action: 'auth.2fa_enabled', requestId: req.id, ip: req.ip });
     // Plaintext codes are shown exactly once.
     return { recoveryCodes };
   });
@@ -179,7 +184,7 @@ async function authRoutes(fastify, { ctx }) {
     await ctx.pool.query(
       `UPDATE admin_users SET totp_enabled = false, totp_secret = NULL, recovery_codes = '{}' WHERE id = $1`,
       [admin.id]);
-    await repos.ops.audit({ tenantId: 1, actorId: admin.id, action: 'auth.2fa_disabled', request_id: req.id, ip: req.ip });
+    await repos.ops.audit({ tenantId: 1, actorId: admin.id, action: 'auth.2fa_disabled', requestId: req.id, ip: req.ip });
     return { ok: true };
   });
 
@@ -200,7 +205,7 @@ async function authRoutes(fastify, { ctx }) {
 
   fastify.post('/auth/logout', { onRequest: fastify.authenticate }, async (req) => {
     await repos.admin.revokeSession(req.admin.sessionId);
-    await repos.ops.audit({ tenantId: req.admin.tenantId, actorId: req.admin.id, action: 'auth.logout', request_id: req.id, ip: req.ip });
+    await repos.ops.audit({ tenantId: req.admin.tenantId, actorId: req.admin.id, action: 'auth.logout', requestId: req.id, ip: req.ip });
     return { ok: true };
   });
 

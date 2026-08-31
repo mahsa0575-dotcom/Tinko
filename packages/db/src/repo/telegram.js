@@ -32,7 +32,7 @@ export function createTelegramRepo(pool) {
          VALUES ($1,$2,$3,$4,$5)
          ON CONFLICT (tenant_id, telegram_id) DO UPDATE
            SET title = EXCLUDED.title, username = EXCLUDED.username, type = EXCLUDED.type,
-               bot_status = EXCLUDED.bot_status, last_activity = now(),
+               last_activity = now(),
                status = CASE WHEN telegram_groups.status = 'orphaned' THEN 'active' ELSE telegram_groups.status END
          RETURNING *`,
         [tenantId, chat.id, chat.title ?? null, chat.username ?? null,
