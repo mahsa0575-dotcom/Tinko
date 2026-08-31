@@ -1,0 +1,88 @@
+name: botai
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: botai
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?set DATABASE_PASSWORD}
+      POSTGRES_DB: botai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U botai -d botai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Never exposed publicly; only reachable on the internal docker network.
+    expose:
+      - "5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    expose:
+      - "6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  bot:
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    # Wait for API (which runs migrations) before starting the pipeline
+    command: >
+      sh -c "until wget -q -O- http://api:8080/health >/dev/null 2>&1; do
+      echo waiting-for-api-migrations; sleep 2; done;
+      node apps/bot/src/index.js"
+    ports:
+      # webhook receiver — proxied by reverse proxy, never public
+      - "127.0.0.1:8081:8081"
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "until wget -q -O- http://api:8080/health >/dev/null 2>&1; do
+      echo waiting-for-api-migrations; sleep 2; done;
+      node apps/worker/src/index.js"
+
+volumes:
+  pgdata:
+  redisdata:

@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+coverage
+.env
+.env.local
+*.log
+.git
+.gitignore
+docs
+README.md
+.vitest-cache

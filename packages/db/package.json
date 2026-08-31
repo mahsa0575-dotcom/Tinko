@@ -1,0 +1,13 @@
+{
+  "name": "@botai/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@botai/core": "*",
+    "pg": "^8.12.0"
+  }
+}

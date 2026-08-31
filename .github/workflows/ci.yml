@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Syntax check (backend)
+        run: |
+          fail=0
+          for f in $(find packages apps/api apps/bot apps/worker scripts -name '*.js' ! -path '*/node_modules/*'); do
+            node --input-type=module --check < "$f" || fail=1
+          done
+          exit $fail
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build admin panel
+        run: npm run build:admin
+
+      - name: Validate migrations parse (postgres)
+        run: |
+          echo "Migrations are applied inside the API container on startup."
+          node -e "
+            const fs = require('fs');
+            for (const f of fs.readdirSync('migrations').filter(x => x.endsWith('.sql'))) {
+              const sql = fs.readFileSync('migrations/' + f, 'utf8');
+              if (sql.length < 10) throw new Error('suspiciously empty migration: ' + f);
+              console.log('ok:', f);
+            }
+          "

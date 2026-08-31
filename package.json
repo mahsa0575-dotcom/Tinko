@@ -1,0 +1,32 @@
+{
+  "name": "botai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise multi-tenant AI Telegram platform",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "migrate": "node scripts/migrate.js",
+    "dev:api": "npm run dev -w @botai/api",
+    "dev:bot": "npm run dev -w @botai/bot",
+    "dev:worker": "npm run dev -w @botai/worker",
+    "dev:admin": "npm run dev -w @botai/admin",
+    "build:admin": "npm run build -w @botai/admin",
+    "start:api": "npm run start -w @botai/api",
+    "start:bot": "npm run start -w @botai/bot",
+    "start:worker": "npm run start -w @botai/worker",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint packages apps scripts"
+  },
+  "devDependencies": {
+    "eslint": "^9.9.0",
+    "vitest": "^2.1.1"
+  }
+}

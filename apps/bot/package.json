@@ -1,0 +1,18 @@
+{
+  "name": "@botai/bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@botai/ai": "*",
+    "@botai/core": "*",
+    "@botai/db": "*",
+    "bullmq": "^5.12.0",
+    "grammy": "^1.30.0",
+    "ioredis": "^5.4.1"
+  }
+}
