@@ -95,6 +95,11 @@
   .metric .metric-value { font-size: 21px; }
   .toasts { inset-inline: 14px; bottom: 82px; }
   .toast { min-width: 0; }
+  .resource-overview { padding: 15px; border-radius: 16px; }
+  .resource-overview-head { align-items: flex-start; flex-direction: column; }
+  .resource-current, .resource-chart-grid { grid-template-columns: 1fr; }
+  .range-switch { width: 100%; }
+  .range-switch button { flex: 1; }
 }
 
 // Command palette

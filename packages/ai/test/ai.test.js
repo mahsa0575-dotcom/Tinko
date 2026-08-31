@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderTemplate, extractPath, extractResponse } from '../src/custom-http.js';
+import { openAiUrl } from '../src/openai-compatible.js';
 import { normalizePersian, createProfanityEngine } from '../../../apps/bot/src/moderation/persian.js';
 import { splitForTelegram, escapeHtml, createPipeline } from '../../../apps/bot/src/pipeline.js';
 
@@ -27,6 +28,19 @@ describe('custom provider template engine', () => {
   it('extractPath resolves dotted paths', () => {
     expect(extractPath({ a: { b: [10, 20] } }, 'a.b.1')).toBe(20);
     expect(extractPath({}, 'x.y')).toBeUndefined();
+  });
+});
+
+describe('OpenAI-compatible endpoint resolution', () => {
+  it('uses the inference API path when a base URL omits /v1', () => {
+    expect(openAiUrl('https://provider.example', '/chat/completions'))
+      .toBe('https://provider.example/v1/chat/completions');
+  });
+  it('does not duplicate /v1 for a versioned base URL', () => {
+    expect(openAiUrl('https://provider.example/v1/', '/chat/completions'))
+      .toBe('https://provider.example/v1/chat/completions');
+    expect(openAiUrl('https://provider.example/v1/', '/v1/chat/completions'))
+      .toBe('https://provider.example/v1/chat/completions');
   });
 });
 

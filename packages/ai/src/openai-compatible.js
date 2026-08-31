@@ -6,7 +6,7 @@ import { AIError, classifyHttpError, wrapNetworkError as wrapNetwork } from './e
  * Mistral, Ollama and any OpenAI-compatible service.
  *
  * config: {
- *   chatPath: '/chat/completions' (default)
+ *   chatPath: '/chat/completions' (default; /v1 is added when base_url lacks it)
  *   defaultHeaders: {}
  * }
  */
@@ -23,7 +23,7 @@ export class OpenAICompatibleAdapter extends AIProviderAdapter {
 
   async chat(req, ctx) {
     if (!ctx.apiKey) throw new AIError('auth', 'No API key configured for this provider', { retryable: false });
-    const url = `${(this.baseUrl ?? '').replace(/\/$/, '')}${this.config.chatPath ?? '/chat/completions'}`;
+    const url = openAiUrl(this.baseUrl, this.config.chatPath ?? '/chat/completions');
     const body = {
       model: req.model,
       messages: req.messages,
@@ -47,7 +47,7 @@ export class OpenAICompatibleAdapter extends AIProviderAdapter {
   }
 
   async embeddings(req, ctx) {
-    const url = `${(this.baseUrl ?? '').replace(/\/$/, '')}/embeddings`;
+    const url = openAiUrl(this.baseUrl, '/embeddings');
     const json = await this.requestJson({
       url, headers: this.#headers(ctx.apiKey),
       body: { model: req.model, input: req.input }, signal: ctx.signal,
@@ -61,7 +61,7 @@ export class OpenAICompatibleAdapter extends AIProviderAdapter {
    */
   async transcribe(req, ctx) {
     if (!ctx.apiKey) throw new AIError('auth', 'No API key configured for this provider', { retryable: false });
-    const url = `${(this.baseUrl ?? '').replace(/\/$/, '')}/audio/transcriptions`;
+    const url = openAiUrl(this.baseUrl, '/audio/transcriptions');
     const timeout = AbortSignal.timeout(this.timeoutMs * 2);
     const form = new FormData();
     const bytes = Buffer.from(req.audioBase64, 'base64');
@@ -90,7 +90,7 @@ export class OpenAICompatibleAdapter extends AIProviderAdapter {
    */
   async *chatStream(req, ctx) {
     if (!ctx.apiKey) throw new AIError('auth', 'No API key configured for this provider', { retryable: false });
-    const url = `${(this.baseUrl ?? '').replace(/\/$/, '')}${this.config.chatPath ?? '/chat/completions'}`;
+    const url = openAiUrl(this.baseUrl, this.config.chatPath ?? '/chat/completions');
     const body = {
       model: req.model, messages: req.messages, stream: true,
       ...(req.temperature != null ? { temperature: req.temperature } : {}),
@@ -134,4 +134,22 @@ export class OpenAICompatibleAdapter extends AIProviderAdapter {
       return { ok: false, latencyMs: Date.now() - start, error: err.message };
     }
   }
+}
+
+/**
+ * Resolve inference endpoints consistently for OpenAI-compatible servers.
+ * A common panel mistake is entering a host such as https://api.example.com
+ * while the provider requires /v1/chat/completions. Preserve explicit /v1
+ * base URLs, but add the version segment when the endpoint is OpenAI-shaped.
+ */
+export function openAiUrl(baseUrl, path) {
+  const base = String(baseUrl ?? '').replace(/\/+$/, '');
+  let endpoint = `/${String(path ?? '').replace(/^\/+/, '')}`;
+  const basePath = (() => {
+    try { return new URL(base).pathname; } catch { return base; }
+  })();
+  const hasVersion = /\/v\d+(?:\/|$)/.test(basePath);
+  if (hasVersion) endpoint = endpoint.replace(/^\/v\d+(?=\/|$)/, '');
+  const isInferencePath = /^(?:\/chat\/completions|\/embeddings|\/audio\/)/.test(endpoint);
+  return `${base}${isInferencePath && !hasVersion ? '/v1' : ''}${endpoint}`;
 }

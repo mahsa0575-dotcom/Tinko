@@ -10,6 +10,7 @@ export function ProvidersPage() {
   const { toast } = useStore();
   const [rows, setRows] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [editingProvider, setEditingProvider] = useState(null);
   const [form, setForm] = useState(null);
   const [keysFor, setKeysFor] = useState(null);
   const [keys, setKeys] = useState([]);
@@ -26,8 +27,20 @@ export function ProvidersPage() {
     setForm({
       slug: '', display_name: '', kind: 'openai_compatible', base_url: '',
       timeout_ms: 60000, max_retries: 2,
-      config: { chatPath: '/chat/completions', responsePath: '', auth: { type: 'bearer' } },
+      config: { chatPath: '/v1/chat/completions', responsePath: '', auth: { type: 'bearer' } },
     });
+    setCreating(true);
+  };
+
+  const startEdit = (provider) => {
+    const config = typeof provider.config === 'string' ? JSON.parse(provider.config || '{}') : (provider.config ?? {});
+    setForm({
+      slug: provider.slug, display_name: provider.display_name, kind: provider.kind,
+      base_url: provider.base_url ?? '', timeout_ms: provider.timeout_ms ?? 60000,
+      max_retries: provider.max_retries ?? 2,
+      config: { chatPath: '/v1/chat/completions', auth: { type: 'bearer' }, ...config },
+    });
+    setEditingProvider(provider);
     setCreating(true);
   };
 
@@ -35,9 +48,11 @@ export function ProvidersPage() {
     try {
       const config = { ...form.config };
       if (!config.responsePath) delete config.responsePath;
-      await api('/providers', { method: 'POST', body: { ...form, config } });
+      await api(editingProvider ? `/providers/${editingProvider.id}` : '/providers', {
+        method: editingProvider ? 'PATCH' : 'POST', body: { ...form, config },
+      });
       toast(t('saved'), 'success');
-      setCreating(false);
+      setCreating(false); setEditingProvider(null);
       load();
     } catch (err) { toast(err.message, 'error'); }
   };
@@ -105,6 +120,7 @@ export function ProvidersPage() {
                 {testing === p.id ? '…' : <><Icon name="zap" size={13} />تست</>}
               </button>
               <button className="btn sm" onClick={() => openKeys(p)}><Icon name="key" size={13} /> کلیدها</button>
+              <button className="btn sm" onClick={() => startEdit(p)} title={t('edit')}><Icon name="edit" size={13} /></button>
               <button className="btn sm danger" onClick={() => remove(p)}><Icon name="trash" size={13} /></button>
             </div>
           )},
@@ -112,7 +128,7 @@ export function ProvidersPage() {
       />
 
       {creating && (
-        <Modal title="تأمین‌کننده‌ی جدید" onClose={() => setCreating(false)} wide>
+        <Modal title={editingProvider ? `ویرایش ${editingProvider.display_name}` : 'تأمین‌کننده‌ی جدید'} onClose={() => { setCreating(false); setEditingProvider(null); }} wide>
           <div className="grid grid-2">
             <div className="field"><label>نامک (slug)</label>
               <input className="input" dir="ltr" value={form.slug}
@@ -138,6 +154,15 @@ export function ProvidersPage() {
               <input className="input" type="number" value={form.max_retries}
                 onChange={(e) => setForm({ ...form, max_retries: Number(e.target.value) })} /></div>
           </div>
+
+          {form.kind === 'openai_compatible' && (
+            <div className="field" style={{ marginTop: 4 }}><label>مسیر Chat Completion</label>
+              <input className="input" dir="ltr" value={form.config.chatPath ?? '/v1/chat/completions'}
+                onChange={(e) => setForm({ ...form, config: { ...form.config, chatPath: e.target.value } })}
+                placeholder="/v1/chat/completions" />
+              <span className="faint" style={{ fontSize: 11 }}>برای URL پایه بدون /v1، همین مقدار پیش‌فرض را نگه دارید.</span>
+            </div>
+          )}
 
           {form.kind === 'custom_http' && (
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 6 }}>
@@ -176,7 +201,7 @@ export function ProvidersPage() {
           )}
 
           <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={() => setCreating(false)}>{t('cancel')}</button>
+            <button className="btn" onClick={() => { setCreating(false); setEditingProvider(null); }}>{t('cancel')}</button>
             <button className="btn primary" onClick={save} disabled={!form.slug || !form.display_name}>{t('save')}</button>
           </div>
         </Modal>
