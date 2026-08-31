@@ -262,6 +262,23 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
   }
 
   /**
+   * Fetch the provider's own model catalogue (panel model-discovery flow).
+   * Takes a real `providers` row, like testProvider(), and normalizes every
+   * failure into { supported:false, reason } so the panel can offer manual
+   * entry instead of a dead end.
+   * @returns {Promise<{supported:boolean, models:Array<object>, reason?:string}>}
+   */
+  async function listProviderModels(providerRow, apiKey) {
+    const adapter = createAdapter(providerRow, { logger });
+    try {
+      return await adapter.listRemoteModels({ apiKey });
+    } catch (err) {
+      logger.warn('model discovery failed', { provider: providerRow.slug, kind: err.kind, error: err.message });
+      return { supported: false, models: [], reason: err.message, kind: err.kind ?? 'unknown' };
+    }
+  }
+
+  /**
    * Embed text using the first available embeddings-capable model.
    * Returns null when no embedding model is configured — callers fall back
    * to importance/recency ranking (graceful degradation, spec §30).
@@ -294,5 +311,5 @@ export function createAiRouter({ aiConfigRepo, opsRepo, logger = rootLogger }) {
     }));
   }
 
-  return { chat, chatStream, transcribe, embed, candidates, testProvider, breakerSnapshot, breaker };
+  return { chat, chatStream, transcribe, embed, candidates, testProvider, listProviderModels, breakerSnapshot, breaker };
 }

@@ -1,5 +1,15 @@
 import { Errors } from '@botai/core';
 
+/** Coerce panel input to a positive integer, or null when absent/invalid. */
+function toPositiveInt(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+function toPositiveNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 /** AI configuration routes: providers, keys, models, profiles, personalities. */
 export async function registerAiRoutes(fastify, { ctx }) {
   const { repos, router } = ctx;
@@ -75,7 +85,89 @@ export async function registerAiRoutes(fastify, { ctx }) {
     if (!req.body?.identifier) throw Errors.validation([{ message: 'identifier required' }]);
     const provider = await repos.aiConfig.getProvider(tenantId(req), req.params.id);
     if (!provider) throw Errors.notFound('Provider');
-    return repos.aiConfig.upsertModel(provider.id, req.body);
+    const model = await repos.aiConfig.upsertModel(provider.id, req.body);
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'model.saved', entityType: 'model', entityId: model.id, after: { identifier: model.identifier }, requestId: req.id });
+    return model;
+  });
+
+  /**
+   * Model discovery: ask the provider which models it actually serves, so the
+   * operator picks a real identifier from a list instead of typing one blind.
+   * Never fails hard — an unsupported or unreachable catalogue returns
+   * supported:false and the panel falls back to manual entry.
+   */
+  fastify.get('/providers/:id/models/discover', guard('models.read'), async (req) => {
+    const provider = await repos.aiConfig.getProvider(tenantId(req), req.params.id);
+    if (!provider) throw Errors.notFound('Provider');
+    const key = await repos.aiConfig.getActiveKeySecret(provider.id);
+    const result = await router.listProviderModels(provider, key?.secret);
+    // Mark which identifiers are already registered so the UI can show them.
+    const known = new Set((await repos.aiConfig.listModels(provider.id)).map((m) => m.identifier));
+    return {
+      supported: result.supported,
+      reason: result.reason ?? null,
+      hasKey: Boolean(key?.secret),
+      count: result.models.length,
+      models: result.models.map((m) => ({ ...m, registered: known.has(m.identifier) })),
+    };
+  });
+
+  /** Register several discovered models at once. */
+  fastify.post('/providers/:id/models/import', guard('models.write'), async (req) => {
+    const provider = await repos.aiConfig.getProvider(tenantId(req), req.params.id);
+    if (!provider) throw Errors.notFound('Provider');
+    const items = Array.isArray(req.body?.models) ? req.body.models : [];
+    if (items.length === 0) throw Errors.validation([{ message: 'models array required' }]);
+    if (items.length > 100) throw Errors.validation([{ message: 'حداکثر ۱۰۰ مدل در هر بار' }]);
+
+    const imported = [];
+    const failed = [];
+    for (const [i, item] of items.entries()) {
+      const identifier = String(item?.identifier ?? '').trim();
+      if (!identifier) { failed.push({ identifier: '', error: 'identifier خالی است' }); continue; }
+      try {
+        imported.push(await repos.aiConfig.upsertModel(provider.id, {
+          identifier,
+          display_name: item.display_name || identifier,
+          description: item.description ?? '',
+          context_window: toPositiveInt(item.context_window),
+          max_output: toPositiveInt(item.max_output),
+          input_price: toPositiveNumber(item.input_price),
+          output_price: toPositiveNumber(item.output_price),
+          capabilities: Array.isArray(item.capabilities) && item.capabilities.length ? item.capabilities : ['chat'],
+          // Preserve the operator's chosen order as the default priority.
+          priority: toPositiveInt(item.priority) ?? (100 + i),
+        }));
+      } catch (err) {
+        failed.push({ identifier, error: err.message });
+      }
+    }
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'models.imported', entityType: 'provider', entityId: provider.id, after: { count: imported.length }, requestId: req.id });
+    return { imported: imported.length, failed, models: imported };
+  });
+
+  /** Edit a registered model (priority, status, capabilities, display name…). */
+  fastify.patch('/models/:id', guard('models.write'), async (req) => {
+    const model = await repos.aiConfig.getModelForTenant(tenantId(req), req.params.id);
+    if (!model) throw Errors.notFound('Model');
+    const updated = await repos.aiConfig.updateModel(model.id, req.body ?? {});
+    if (!updated) throw Errors.validation([{ message: 'هیچ فیلد قابل‌ویرایشی ارسال نشد' }]);
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'model.updated', entityType: 'model', entityId: model.id, before: { status: model.status, priority: model.priority }, after: req.body, requestId: req.id });
+    return updated;
+  });
+
+  fastify.delete('/models/:id', guard('models.write'), async (req) => {
+    const model = await repos.aiConfig.getModelForTenant(tenantId(req), req.params.id);
+    if (!model) throw Errors.notFound('Model');
+    const usedBy = await repos.aiConfig.profilesUsingModel(model.id);
+    if (usedBy.length > 0 && !req.query.force) {
+      throw Errors.validation([{
+        message: `این مدل در پروفایل‌های ${usedBy.map((p) => p.name).join('، ')} استفاده می‌شود. برای حذف، force=1 بفرستید.`,
+      }]);
+    }
+    await repos.aiConfig.deleteModel(model.id);
+    await repos.ops.audit({ tenantId: tenantId(req), actorId: req.admin.id, action: 'model.deleted', entityType: 'model', entityId: model.id, before: { identifier: model.identifier }, requestId: req.id });
+    return { ok: true };
   });
 
   // ---------- Logical profiles ----------

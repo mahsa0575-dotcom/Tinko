@@ -18,6 +18,9 @@ export function VpsPage() {
   const [lastError, setLastError] = useState(null);
   const [thresholds, setThresholds] = useState(null);
   const [showThresholds, setShowThresholds] = useState(false);
+  // Diagnostics returned alongside the "unavailable" answer, so the operator
+  // sees WHY there is no data instead of a bare error string.
+  const [diag, setDiag] = useState(null);
   const timer = useRef(null);
 
   const loadThresholds = () => api('/settings/resource-thresholds').then(setThresholds).catch(() => {});
@@ -39,8 +42,9 @@ export function VpsPage() {
       try {
         const data = await api('/resources/latest');
         if (cancelled) return;
+        setDiag(data.worker ?? null);
         if (data.available) { setLatest(data); setLastError(null); }
-        else setLastError(data.reason);
+        else { setLatest(null); setLastError(data.reason); }
       } catch (err) { setLastError(err.message); }
     };
     const loadHistory = () => api('/resources/history?minutes=30').then(setHistory).catch(() => {});
@@ -61,7 +65,19 @@ export function VpsPage() {
         <div className="card"><div className="empty">
           <div className="empty-icon"><Icon name="globe" size={24} /></div>
           <div className="empty-title">{t('unavailable')}</div>
-          <div className="muted">{lastError}</div>
+          <div className="muted" style={{ maxWidth: 520, margin: '0 auto' }}>{lastError}</div>
+          {diag && (
+            <div className="notice info mt" style={{ textAlign: 'start', maxWidth: 520, margin: '16px auto 0' }}>
+              <Icon name="info" size={15} />
+              <div>
+                <div>سرویس worker: <strong>{diag.alive ? 'در حال اجرا' : 'خارج از دسترس'}</strong></div>
+                {diag.lastSeenAt && <div className="faint" style={{ fontSize: 12 }}>آخرین heartbeat: {fmtTime(diag.lastSeenAt)}</div>}
+                {!diag.alive && (
+                  <div className="faint mono" dir="ltr" style={{ fontSize: 11.5, marginTop: 6 }}>docker compose up -d worker</div>
+                )}
+              </div>
+            </div>
+          )}
           <button className="btn primary mt" onClick={() => setPaused((p) => !p)}><Icon name="refresh" size={14} /> {t('refresh')}</button>
         </div></div>
       </div>
@@ -76,6 +92,9 @@ export function VpsPage() {
   const rootDisk = (latest.disks ?? []).find((d) => d.mount === '/') ?? (latest.disks ?? [])[0];
   const load1 = latest.load_avg?.[0];
   const loadRatio = load1 && latest.cpu_cores ? load1 / latest.cpu_cores : null;
+  // The collector reports the cgroup CPU quota separately, because the stored
+  // cpu_cores column is an integer and rounds a fractional limit up.
+  const coreLabel = latest.cpuQuota ?? latest.cpu_quota ?? latest.cpu_cores;
 
   const pick = (arr, key) => (arr ?? []).map((row) => row[key]);
 
@@ -92,7 +111,8 @@ export function VpsPage() {
         )}
         <button className="btn sm ghost" onClick={() => setShowThresholds(true)} title="آستانه‌های هشدار"><Icon name="settings" size={13} /></button>
         <span className="status-pill">
-          <span className="pulse ok" /> {t('live')} · {fmtTime(latest.captured_at)}
+          <span className={`pulse ${latest.stale ? 'warn' : 'ok'}`} />
+          {latest.stale ? 'کهنه' : t('live')} · {fmtTime(latest.captured_at)}
         </span>
         <button className="btn sm ghost" onClick={() => setPaused((p) => !p)}
           title={paused ? t('refresh') : t('live')}>
@@ -100,8 +120,20 @@ export function VpsPage() {
         </button>
       </div>
       <p className="page-subtitle">
-        {latest.source === 'container' ? 'Container metrics' : 'Host/VPS metrics'} · {t('live')}
+        {latest.source === 'container' ? 'متریک‌های کانتینر' : 'متریک‌های هاست / VPS'}
+        {latest.ageMs != null && ` · ${Math.round(latest.ageMs / 1000)} ثانیه پیش`}
       </p>
+
+      {latest.stale && (
+        <div className="notice warn" style={{ marginBottom: 16 }}>
+          <Icon name="alert" size={15} />
+          <div>
+            آخرین متریک بیش از یک دقیقه قدیمی است
+            {latest.worker && !latest.worker.alive && ' — سرویس worker heartbeat نمی‌فرستد'}.
+            اعداد زیر لحظه‌ای نیستند.
+          </div>
+        </div>
+      )}
 
       {/* Thresholds editor (spec §95) */}
       {showThresholds && thresholds && (
@@ -140,9 +172,14 @@ export function VpsPage() {
       <div className="vps-top-cards">
         <div className="card" style={{ padding: 14 }}>
           <div className="card-title"><Icon name="cpu" size={14} /> {t('cpu')}</div>
-          <div className="vps-value-row"><span className="big">{fmtNum(latest.cpu_percent)}٪</span></div>
+          <div className="vps-value-row">
+            <span className="big">{latest.cpu_percent != null ? `${fmtNum(latest.cpu_percent)}٪` : '—'}</span>
+          </div>
           <Progress pct={latest.cpu_percent} />
-          <div className="muted" style={{ fontSize: 11 }}>{fmtNum(latest.cpu_cores)} cores</div>
+          <div className="muted" style={{ fontSize: 11 }}>
+            {fmtNum(coreLabel)} هسته
+            {latest.host_cores && latest.host_cores !== latest.cpu_cores && ` (هاست: ${fmtNum(latest.host_cores)})`}
+          </div>
         </div>
         <div className="card" style={{ padding: 14 }}>
           <div className="card-title"><Icon name="ram" size={14} /> {t('ram')}</div>
@@ -150,7 +187,7 @@ export function VpsPage() {
             <span className="big">{fmtBytes(latest.mem_used)}</span><span className="unit">/ {fmtBytes(latest.mem_total)}</span>
           </div>
           <Progress pct={memPct} />
-          <div className="muted" style={{ fontSize: 11 }}>{fmtNum(memPct)}٪</div>
+          <div className="muted" style={{ fontSize: 11 }}>{memPct != null ? `${fmtNum(memPct)}٪` : 'در دسترس نیست'}</div>
         </div>
         <div className="card" style={{ padding: 14 }}>
           <div className="card-title"><Icon name="database" size={14} /> {t('swap')}</div>
@@ -176,7 +213,7 @@ export function VpsPage() {
           <div className="card-title"><Icon name="gauge" size={14} /> {t('load')}</div>
           <div className="vps-value-row">
             <span className="big">{load1 != null ? fmtNum(load1) : '—'}</span>
-            <span className="unit">/ {fmtNum(latest.cpu_cores)} cores</span>
+            <span className="unit">/ {fmtNum(coreLabel)} هسته</span>
           </div>
           {loadRatio != null && <Progress pct={loadRatio * 100} />}
         </div>

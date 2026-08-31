@@ -73,6 +73,35 @@ export function createAiConfigRepo(pool, { encrypt, decrypt, mask }) {
          FROM models m JOIN providers p ON p.id = m.provider_id
          WHERE m.status = 'active' AND p.status = 'active'
          ORDER BY m.priority`)).rows,
+    /** Fetch one model, scoped through its provider to the tenant. */
+    getModelForTenant: async (tenantId, modelId) => {
+      const { rows } = await pool.query(
+        `SELECT m.*, p.tenant_id, p.slug AS provider_slug
+         FROM models m JOIN providers p ON p.id = m.provider_id
+         WHERE p.tenant_id = $1 AND m.id = $2`, [tenantId, modelId]);
+      return rows[0] ?? null;
+    },
+    updateModel: async (modelId, patch) => {
+      const allowed = ['display_name', 'description', 'context_window', 'max_output',
+        'input_price', 'output_price', 'capabilities', 'aliases', 'priority', 'status'];
+      const cols = Object.keys(patch).filter((k) => allowed.includes(k));
+      if (cols.length === 0) return null;
+      const sets = cols.map((c, i) => `${c} = $${i + 2}`).join(', ');
+      const { rows } = await pool.query(
+        `UPDATE models SET ${sets} WHERE id = $1 RETURNING *`,
+        [modelId, ...cols.map((c) => patch[c])]);
+      return rows[0] ?? null;
+    },
+    deleteModel: async (modelId) => {
+      await pool.query(`DELETE FROM models WHERE id = $1`, [modelId]);
+    },
+    /** Profiles that reference this model — used to warn before deletion. */
+    profilesUsingModel: async (modelId) =>
+      (await pool.query(
+        `SELECT DISTINCT mp.id, mp.key, mp.name
+         FROM model_profiles mp JOIN model_profile_models mpm ON mpm.profile_id = mp.id
+         WHERE mpm.model_id = $1`, [modelId])).rows,
+
     upsertModel: async (providerId, m) => {
       const { rows } = await pool.query(
         `INSERT INTO models (provider_id, identifier, display_name, description, context_window, max_output,
@@ -92,11 +121,20 @@ export function createAiConfigRepo(pool, { encrypt, decrypt, mask }) {
     },
 
     // --- logical profiles ---
+    // The chain carries the model identity too, so the panel can render
+    // "openai / gpt-4o" instead of a bare numeric id.
     listProfiles: async (tenantId) =>
       (await pool.query(
-        `SELECT mp.*, json_agg(json_build_object('model_id', mpm.model_id, 'position', mpm.position)
-                ORDER BY mpm.position) AS models
-         FROM model_profiles mp LEFT JOIN model_profile_models mpm ON mpm.profile_id = mp.id
+        `SELECT mp.*, json_agg(
+                  json_build_object(
+                    'model_id', mpm.model_id, 'position', mpm.position,
+                    'identifier', m.identifier, 'display_name', m.display_name,
+                    'provider_slug', p.slug, 'status', m.status)
+                  ORDER BY mpm.position) AS models
+         FROM model_profiles mp
+         LEFT JOIN model_profile_models mpm ON mpm.profile_id = mp.id
+         LEFT JOIN models m ON m.id = mpm.model_id
+         LEFT JOIN providers p ON p.id = m.provider_id
          WHERE mp.tenant_id = $1 GROUP BY mp.id ORDER BY mp.key`, [tenantId])).rows,
     saveProfile: async (tenantId, { key, name, description = '', models = [] }) => {
       const client = await pool.connect();

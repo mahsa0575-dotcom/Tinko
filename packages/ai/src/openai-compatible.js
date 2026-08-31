@@ -46,6 +46,23 @@ export class OpenAICompatibleAdapter extends AIProviderAdapter {
     };
   }
 
+  /**
+   * Model discovery via GET /v1/models — the OpenAI catalogue endpoint, also
+   * implemented by DeepSeek, Groq, OpenRouter, Together, Mistral and Ollama.
+   * Normalizes the provider-specific extras (context length, pricing,
+   * modalities) so the panel can pre-fill the registration form.
+   */
+  async listRemoteModels(ctx = {}) {
+    const url = openAiUrl(this.baseUrl, this.config.modelsPath ?? '/models');
+    const json = await this.requestJsonGet({ url, headers: this.#headers(ctx.apiKey), signal: ctx.signal });
+    const raw = Array.isArray(json) ? json : (json.data ?? json.models ?? []);
+    const models = raw
+      .map((m) => normalizeRemoteModel(m))
+      .filter((m) => m.identifier)
+      .sort((a, b) => a.identifier.localeCompare(b.identifier));
+    return { supported: true, models };
+  }
+
   async embeddings(req, ctx) {
     const url = openAiUrl(this.baseUrl, '/embeddings');
     const json = await this.requestJson({
@@ -137,6 +154,62 @@ export class OpenAICompatibleAdapter extends AIProviderAdapter {
 }
 
 /**
+ * Map one catalogue entry onto the shape the `models` table expects.
+ * Different vendors nest the same facts differently, so every field is probed
+ * across the known aliases and left null when the provider stays silent —
+ * the panel shows "—" rather than inventing a value.
+ */
+export function normalizeRemoteModel(m) {
+  const identifier = String(m.id ?? m.name ?? m.model ?? '').trim();
+  const contextWindow = firstNumber([
+    m.context_length, m.context_window, m.max_context_length,
+    m.top_provider?.context_length, m.limits?.max_context_tokens,
+  ]);
+  const maxOutput = firstNumber([
+    m.max_output_tokens, m.max_completion_tokens,
+    m.top_provider?.max_completion_tokens, m.limits?.max_output_tokens,
+  ]);
+  // OpenRouter reports per-token USD prices as strings; convert to per-1M tokens.
+  const perToken = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 1_000_000 * 1e6) / 1e6 : null;
+  };
+
+  const modalities = [
+    ...(m.architecture?.input_modalities ?? []),
+    ...(m.architecture?.modality ? String(m.architecture.modality).split(/[->+,]/) : []),
+  ].map((s) => s.trim().toLowerCase());
+
+  const capabilities = new Set(['chat', 'streaming']);
+  const idLower = identifier.toLowerCase();
+  if (modalities.includes('image') || /vision|-vl|4o|gemini|claude-3|llava/.test(idLower)) capabilities.add('vision');
+  if (modalities.includes('audio') || /whisper|audio|transcribe/.test(idLower)) capabilities.add('audio');
+  if (/embed/.test(idLower)) { capabilities.delete('chat'); capabilities.delete('streaming'); capabilities.add('embeddings'); }
+  if (m.supported_parameters?.includes?.('tools') || /gpt-4|gpt-5|claude|deepseek|qwen|llama-3/.test(idLower)) capabilities.add('tools');
+
+  return {
+    identifier,
+    display_name: m.display_name ?? m.name ?? identifier,
+    description: typeof m.description === 'string' ? m.description.slice(0, 400) : '',
+    context_window: contextWindow,
+    max_output: maxOutput,
+    input_price: perToken(m.pricing?.prompt ?? m.pricing?.input),
+    output_price: perToken(m.pricing?.completion ?? m.pricing?.output),
+    capabilities: [...capabilities],
+    owned_by: m.owned_by ?? m.organization ?? null,
+    created: m.created ?? null,
+  };
+}
+
+function firstNumber(values) {
+  for (const v of values) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return Math.round(n);
+  }
+  return null;
+}
+
+/**
  * Resolve inference endpoints consistently for OpenAI-compatible servers.
  * A common panel mistake is entering a host such as https://api.example.com
  * while the provider requires /v1/chat/completions. Preserve explicit /v1
@@ -150,6 +223,6 @@ export function openAiUrl(baseUrl, path) {
   })();
   const hasVersion = /\/v\d+(?:\/|$)/.test(basePath);
   if (hasVersion) endpoint = endpoint.replace(/^\/v\d+(?=\/|$)/, '');
-  const isInferencePath = /^(?:\/chat\/completions|\/embeddings|\/audio\/)/.test(endpoint);
+  const isInferencePath = /^(?:\/chat\/completions|\/embeddings|\/audio\/|\/models)/.test(endpoint);
   return `${base}${isInferencePath && !hasVersion ? '/v1' : ''}${endpoint}`;
 }

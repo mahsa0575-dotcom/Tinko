@@ -35,6 +35,20 @@ export class MockAdapter extends AIProviderAdapter {
     }
   }
 
+  /** Deterministic catalogue so the panel's discovery flow is testable offline. */
+  async listRemoteModels() {
+    if ((this.config.mode ?? 'success') !== 'success') {
+      throw new AIError('server_error', `mock mode=${this.config.mode}`);
+    }
+    return {
+      supported: true,
+      models: this.config.remoteModels ?? [
+        { identifier: 'mock-smart', display_name: 'Mock Smart', description: '', context_window: 128_000, max_output: 4096, input_price: null, output_price: null, capabilities: ['chat', 'streaming', 'tools'], owned_by: 'mock', created: null },
+        { identifier: 'mock-fast', display_name: 'Mock Fast', description: '', context_window: 32_000, max_output: 2048, input_price: null, output_price: null, capabilities: ['chat', 'streaming'], owned_by: 'mock', created: null },
+      ],
+    };
+  }
+
   async healthCheck(ctx) {
     const ok = (this.config.mode ?? 'success') === 'success';
     return { ok, latencyMs: 1, error: ok ? undefined : `mock mode=${this.config.mode}` };

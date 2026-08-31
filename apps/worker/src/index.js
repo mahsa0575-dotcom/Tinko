@@ -36,8 +36,13 @@ export async function startWorker(overrides = {}) {
     new Worker('metrics', async (job) => {
       if (job.name === 'collect-metrics') {
         const metrics = await collectResourceMetrics();
+        // A snapshot with no CPU *and* no memory means every probe failed;
+        // storing it would make the VPS page look alive while showing nothing.
+        if (metrics.cpuPercent == null && metrics.memTotal == null) {
+          throw new Error('resource probes returned no data (host may block /proc or /sys)');
+        }
         await repos.ops.saveResourceMetrics(metrics);
-        return { capturedAt: metrics.capturedAt };
+        return { capturedAt: metrics.capturedAt, cpu: metrics.cpuPercent, source: metrics.source };
       }
       if (job.name === 'aggregate-metrics') return runMetricsAggregation(ctx);
     }, { connection, concurrency: 1 }),
@@ -57,8 +62,21 @@ export async function startWorker(overrides = {}) {
   ];
 
   workers.forEach((w) => {
-    w.on('failed', (job, err) => log.error('job failed', { queue: w.name, job: job.name, error: err.message, attempts: job.attemptsMade }));
+    // `job` is undefined when BullMQ cannot even deserialize the job, so every
+    // field is read defensively — the old handler threw inside the error
+    // handler itself and hid the original failure.
+    w.on('failed', (job, err) => log.error('job failed', {
+      queue: w.name, job: job?.name ?? 'unknown',
+      error: err?.message ?? String(err), attempts: job?.attemptsMade ?? 0,
+    }));
+    w.on('error', (err) => log.error('worker error', { queue: w.name, error: err?.message ?? String(err) }));
   });
+
+  // Surface a first-cycle collector failure at boot instead of leaving the VPS
+  // page stuck on "unavailable" with nothing in the logs.
+  collectResourceMetrics()
+    .then((m) => log.info('resource collector ready', { cpuPercent: m.cpuPercent, cores: m.cpuCores, source: m.source }))
+    .catch((err) => log.error('resource collector failed at startup', { error: err.message }));
 
   await repos.ops.heartbeat('worker', new Date()).catch(() => {});
   await repos.ops.heartbeat('scheduler', new Date()).catch(() => {});

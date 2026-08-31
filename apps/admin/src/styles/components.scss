@@ -1,12 +1,16 @@
 // Reusable UI primitives: buttons, cards, tables, badges, inputs, modals, toasts.
 
+// PERF: `.card` is the most-instantiated component in the panel — a dashboard
+// renders 10–20 of them. Each one carried `backdrop-filter: blur(10px)`, i.e.
+// 10–20 independent GPU readback layers that all repaint on scroll. The cards
+// sit on a near-solid background, so an opaque surface is visually identical
+// and costs nothing.
 .card {
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 20px;
   box-shadow: var(--shadow-1);
-  backdrop-filter: blur(10px);
   transition: border-color var(--t-fast) var(--ease);
 }
 .card:hover { border-color: color-mix(in srgb, var(--border-strong) 70%, transparent); }
@@ -21,11 +25,10 @@
 .metric {
   --accent: var(--primary);
   position: relative; overflow: hidden;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: var(--surface);
   border: 1px solid var(--border); border-radius: 16px;
   padding: 16px 18px 15px;
   display: flex; flex-direction: column; gap: 7px;
-  backdrop-filter: blur(10px);
   transition: transform var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
   &:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); box-shadow: var(--shadow-2); }
   &::before { // soft accent glow, top corner
@@ -64,8 +67,10 @@
   button { appearance: none; border: 0; border-radius: 8px; padding: 6px 10px; color: var(--text-muted); background: transparent; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
     transition: color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast); &:hover { color: var(--text); } &.active { color: var(--primary); background: var(--surface); box-shadow: var(--shadow-1); } }
 }
-.resource-current { position: relative; margin-bottom: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.resource-chart-grid { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+// Fixed 4-up / 2-up grids squeezed cards to unreadable widths between 760px and
+// 1100px; auto-fit reflows instead of shrinking.
+.resource-current { position: relative; margin-bottom: 16px; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
+.resource-chart-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; }
 .resource-chart-card { padding: 16px; min-width: 0; }
 .resource-chart-head { justify-content: space-between; margin-bottom: 4px; }
 .resource-chart-head .card-title { margin: 0; }
@@ -115,12 +120,15 @@
   label { font-size: 12px; font-weight: 700; color: var(--text-muted); } }
 
 // --- table ---
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(10px); }
+// PERF: a blurred wrapper around a scrollable table is the worst case for
+// backdrop-filter — every horizontal scroll invalidates the whole layer.
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 table.table { width: 100%; border-collapse: collapse; font-size: 13px;
   th {
     text-align: start; padding: 11px 15px; color: var(--text-faint); font-size: 11.5px; font-weight: 700;
-    border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface-2) 65%, transparent);
+    border-bottom: 1px solid var(--border); background: var(--surface-2);
     white-space: nowrap; cursor: pointer; user-select: none;
+    position: sticky; top: 0; z-index: 1;
     transition: color var(--t-fast);
     &:hover { color: var(--text-muted); }
   }
@@ -145,8 +153,10 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px;
 }
 
 // --- modal ---
+// A darker scrim replaces blur(5px): same focus effect, no full-screen readback
+// while the modal's own entry animation is running.
 .modal-backdrop {
-  position: fixed; inset: 0; background: rgba(3, 6, 14, .62); backdrop-filter: blur(5px);
+  position: fixed; inset: 0; background: rgba(3, 6, 14, .74);
   display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px;
   animation: fade-in .16s ease;
 }
@@ -156,6 +166,10 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px;
   padding: 24px; animation: modal-in .22s var(--ease);
 }
 .modal.wide { max-width: 860px; }
+@media (max-width: 640px) {
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal, .modal.wide { max-width: 100%; max-height: 94vh; border-radius: 20px 20px 0 0; padding: 20px 16px 24px; }
+}
 .modal-head { display: flex; align-items: center; margin-bottom: 18px; gap: 10px;
   h3 { font-size: 16px; flex: 1; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; } }
@@ -164,7 +178,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px;
 // --- toasts ---
 .toasts { position: fixed; bottom: 20px; inset-inline-end: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 80; }
 .toast {
-  background: var(--glass); backdrop-filter: blur(12px);
+  background: var(--glass); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-strong); border-radius: 13px;
   padding: 12px 17px; font-size: 13px; box-shadow: var(--shadow-3); min-width: 250px;
   animation: toast-in .25s var(--ease);
@@ -216,5 +230,56 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px;
 // --- segmented stat rows / misc ---
 .kv-list { display: flex; flex-direction: column; gap: 8px;
   .kv { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 7px 12px; border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 60%, transparent);
-    border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); } }
+    padding: 7px 12px; border-radius: 10px; background: var(--surface-2);
+    border: 1px solid var(--border); } }
+
+// --- inline notice (warnings inside modals / panels) ---
+.notice {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.7;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  > svg { flex-shrink: 0; margin-top: 3px; }
+  &.warn { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 28%, transparent);
+    > svg { color: var(--warning); } }
+  &.bad  { background: var(--danger-soft);  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+    > svg { color: var(--danger); } }
+  &.info { background: var(--info-soft);    border-color: color-mix(in srgb, var(--info) 28%, transparent);
+    > svg { color: var(--info); } }
+}
+
+// --- capability chip picker ---
+.chip-picker { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-muted);
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+  &:hover { border-color: var(--text-faint); color: var(--text); }
+  &.active { background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 40%, transparent); color: var(--primary); }
+}
+
+// --- model discovery list (virtual-free, capped height + own scroll layer) ---
+.discover-list {
+  max-height: 46vh; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--border); border-radius: 13px; background: var(--surface-2);
+  contain: content;
+}
+.discover-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 13px; cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  transition: background var(--t-fast);
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--primary-soft); }
+  input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--primary); flex-shrink: 0; cursor: pointer; }
+  &.is-registered { opacity: .58; cursor: default;
+    &:hover { background: transparent; } }
+}
+
+// --- profile fallback chain ---
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.chain-item { display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  .badge { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; } }
+.chain-arrow { color: var(--text-faint); font-size: 12px; }

@@ -1,3 +1,6 @@
+import { Errors } from '@botai/core';
+import { DEFAULT_THRESHOLDS } from './debug-routes.js';
+
 /** Platform routes: analytics, audit logs, notifications, system health, metrics. */
 export async function registerPlatformRoutes(fastify, { ctx }) {
   const { repos, pool, router } = ctx;
@@ -112,12 +115,42 @@ export async function registerPlatformRoutes(fastify, { ctx }) {
   });
 
   // ---------- Resource metrics (real VPS data written by the worker) ----------
+  /**
+   * The panel showed a bare "unavailable" whenever the collector was silent,
+   * with no way to tell a stopped worker from a crashing probe. The reason now
+   * names the actual cause and stale readings are still returned, flagged.
+   */
   fastify.get('/resources/latest', guard('analytics.read'), async () => {
-    const latest = await repos.ops.latestResourceMetrics();
-    if (!latest) return { available: false, reason: 'هیچ داده‌ای از جمع‌آوری متریک‌ها دریافت نشده است' };
+    const [latest, workerHealth] = await Promise.all([
+      repos.ops.latestResourceMetrics(),
+      repos.ops.serviceHealth().then((rows) => rows.find((s) => s.service === 'worker') ?? null).catch(() => null),
+    ]);
+    const workerSeenAt = workerHealth?.heartbeat_at ?? null;
+    const workerAliveMs = workerSeenAt ? Date.now() - new Date(workerSeenAt).getTime() : null;
+    const workerAlive = workerHealth?.status === 'online' && workerAliveMs != null && workerAliveMs < 120_000;
+
+    if (!latest) {
+      return {
+        available: false,
+        reason: workerAlive
+          ? 'سرویس worker در حال اجراست اما هنوز متریکی ثبت نکرده است — لاگ worker را بررسی کنید'
+          : 'سرویس worker در دسترس نیست؛ جمع‌آوری متریک‌ها اجرا نمی‌شود (docker compose up -d worker)',
+        worker: { alive: workerAlive, lastSeenAt: workerSeenAt },
+      };
+    }
+
     const thresholds = await repos.ops.getSetting('resource_thresholds', DEFAULT_THRESHOLDS);
-    const health = computeHealthScore(latest, thresholds);
-    return { available: true, health, thresholds, ...latest };
+    const ageMs = Date.now() - new Date(latest.captured_at).getTime();
+    return {
+      available: true,
+      health: computeHealthScore(latest, thresholds),
+      thresholds,
+      ageMs,
+      // Anything older than a minute is history, not a live reading.
+      stale: ageMs > 60_000,
+      worker: { alive: workerAlive, lastSeenAt: workerSeenAt },
+      ...latest,
+    };
   });
 
   fastify.get('/resources/history', guard('analytics.read'), async (req) => {
@@ -171,8 +204,6 @@ export async function registerPlatformRoutes(fastify, { ctx }) {
 
   function dbOk(latencyMs) { return latencyMs < 2000; }
 }
-
-import { DEFAULT_THRESHOLDS } from './debug-routes.js';
 
 /**
  * VPS health score (spec §94): Excellent → Critical from real metrics and

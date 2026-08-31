@@ -73,6 +73,17 @@ services:
       dockerfile: apps/worker/Dockerfile
     restart: unless-stopped
     env_file: .env
+    # The VPS page must report the HOST's resources, not the container's slice.
+    # pid: host lets the collector see real processes; the read-only /host
+    # mounts expose the host's /proc and /sys. Without these, "CPU/RAM" only
+    # ever described this one container.
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+    environment:
+      # The collector reads CPU/RAM/load/swap from this path so the figures
+      # describe the VPS rather than this container.
+      HOST_PROC: /host/proc
     depends_on:
       api:
         condition: service_started

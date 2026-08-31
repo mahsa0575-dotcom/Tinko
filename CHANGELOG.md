@@ -115,3 +115,60 @@
 ### Ops
 - Worker: real OS-level metrics (systeminformation), provider health checks with alerts + dedup, 1m/5m/1h metric aggregation, retention cleanup
 - Docker Compose for full VPS deployment; API auto-runs migrations; bot/worker wait for migrations; admin panel served by API
+
+## [Unreleased] — رفع سه مشکل گزارش‌شده
+
+### ۱. انتخاب ID مدل (کشف مدل از تأمین‌کننده)
+پیش از این شناسه‌ی مدل فقط **دستی** تایپ می‌شد و هیچ راهی برای دیدن فهرست
+مدل‌های واقعی تأمین‌کننده وجود نداشت.
+
+- `AIProviderAdapter.listRemoteModels()` به‌عنوان قرارداد پایه (پیش‌فرض: `supported:false`)
+- پیاده‌سازی برای OpenAI-compatible (`GET /v1/models`)، Anthropic، و Mock
+- `normalizeRemoteModel()` — استخراج context window، تبدیل قیمت OpenRouter
+  (per-token → per-1M) و استنتاج قابلیت‌ها (vision/audio/tools/embeddings)
+- `router.listProviderModels()` با نرمال‌سازی خطا (هرگز hard-fail نمی‌کند)
+- API جدید:
+  - `GET  /providers/:id/models/discover` — فهرست + علامت‌گذاری ثبت‌شده‌ها
+  - `POST /providers/:id/models/import` — ثبت گروهی (حداکثر ۱۰۰، خطای جزئی)
+  - `PATCH  /models/:id` — ویرایش مدل
+  - `DELETE /models/:id` — حذف با محافظ استفاده در پروفایل (`?force=1`)
+- Repo: `getModelForTenant`, `updateModel`, `deleteModel`, `profilesUsingModel`
+- `listProfiles` اکنون `identifier`/`display_name`/`provider_slug` را JOIN می‌کند
+- **پنل**: مودال «دریافت لیست مدل‌ها» با جستجو، انتخاب چندگانه، ثبت گروهی،
+  ثبت تک‌به‌تک با ویرایش، و fallback ثبت دستی وقتی تأمین‌کننده فهرست ندارد
+- **رفع باگ**: زنجیره‌ی پروفایل با `providerName(m.model_id)` رندر می‌شد و همیشه
+  `#<id>` نشان می‌داد؛ اکنون نام واقعی مدل نمایش داده می‌شود
+- افزودن ویرایش/حذف مدل و انتخابگر قابلیت‌ها به پنل + جابه‌جایی ترتیب fallback
+
+### ۲. بهینه‌سازی دیزاین
+- حذف `backdrop-filter` از `.card`، `.metric`، `.table-wrap`، سایدبار و تاپ‌بار
+  (هر کارت یک لایه‌ی GPU مستقل بود؛ در داشبورد ۱۰–۲۰ لایه)
+- ادغام دو لایه‌ی fixed پس‌زمینه (`body::before` + `body::after`) در یک لایه‌ی
+  محدودشده به نوار بالایی — حذف یک بافت تمام‌صفحه
+- اوربهای صفحه‌ی ورود: `blur(80px)` → `blur(48px)`، فقط یک اورب متحرک
+- breakpoint تبلت (۷۶۱–۱۱۰۰px) با سایدبار آیکونی — قبلاً از دسکتاپ مستقیم به موبایل می‌رفت
+- گریدهای ثابت (`repeat(4,...)`, `repeat(2,...)`) → `auto-fit` با `min()`
+  تا در عرض کم سرریز نکنند (شامل `.vps-top-cards`)
+- مودال تمام‌عرض bottom-sheet زیر ۶۴۰px
+- احترام به `prefers-reduced-motion` و `prefers-reduced-transparency`
+- **رفع باگ**: `@keyframes spin` وجود نداشت — همه‌ی اسپینرهای پنل ساکن بودند
+
+### ۳. CPU / RAM «در دسترس نیست»
+**علت اصلی**: `apps/worker/src/jobs/metrics.js` تابع `si.load()` را صدا می‌زد که
+در systeminformation **وجود ندارد** (فقط `si.fullLoad()` هست). این reject کل
+`Promise.all` را می‌شکست، پس `saveResourceMetrics()` **هرگز** اجرا نمی‌شد.
+
+- بازنویسی کامل collector با ایزوله‌سازی هر probe (timeout ۴s، خطا → `null`)
+- خواندن مستقیم `/proc` برای متریک هاست از داخل کانتینر (`HOST_PROC`) —
+  چون systeminformation از HOST_PROC پشتیبانی نمی‌کند (با grep در node_modules تأیید شد)
+- خواندن محدودیت cgroup v1/v2 (`memory.max`، `cpu.max`، `cfs_quota_us`)
+- کش ۱۰ ثانیه‌ای نمونه‌گیری پروسه‌ها
+- `docker-compose.yml`: worker با `pid: host` + mount `/proc:/host/proc:ro`
+- `/resources/latest` اکنون **دلیل** نبود داده را برمی‌گرداند
+  (worker خواب است؟ یا اجرا می‌شود ولی probe خطا می‌دهد) + `ageMs`/`stale`
+- worker خطای collector را لاگ می‌کند و snapshot تمام‌null را رد می‌کند
+- **پنل VPS**: نمایش وضعیت worker، سن داده، هشدار «کهنه»، و هسته‌های هاست/کوتا
+
+### رفع اضافه
+- `platform-routes.js` بدون `import { Errors }` از آن استفاده می‌کرد →
+  `ReferenceError` روی `/analytics/timeseries?metric=<unknown>`

@@ -44,6 +44,39 @@ export class AIProviderAdapter {
     throw new AIError('bad_response', `Adapter ${this.kind} does not implement chat()`, { retryable: false });
   }
 
+  /**
+   * List the models the provider itself advertises.
+   * Subclasses that expose a catalogue endpoint override this; the base class
+   * reports "not supported" so the panel can fall back to manual entry instead
+   * of showing a hard error.
+   * @returns {Promise<{supported:boolean, models:Array<object>, reason?:string}>}
+   */
+  async listRemoteModels() {
+    return { supported: false, models: [], reason: `پرووایدر «${this.kind}» فهرست مدل‌ها را ارائه نمی‌دهد` };
+  }
+
+  /**
+   * GET JSON with timeout + normalized errors. Used by catalogue endpoints
+   * (model discovery) where requestJson()'s POST semantics do not apply.
+   */
+  async requestJsonGet({ url, headers, signal }) {
+    const timeout = AbortSignal.timeout(this.timeoutMs);
+    const merged = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    let res;
+    try {
+      res = await this.fetch(url, { method: 'GET', headers: { accept: 'application/json', ...headers }, signal: merged });
+    } catch (err) {
+      throw wrapNetworkError(err);
+    }
+    if (!res.ok) throw classifyHttpError(res.status, await res.text().catch(() => ''));
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new AIError('bad_response', 'Provider returned invalid JSON', { retryable: false });
+    }
+  }
+
   /** Health probe: cheap authenticated request. Returns {ok, latencyMs, error}. */
   async healthCheck(ctx) {
     const start = Date.now();

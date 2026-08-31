@@ -36,9 +36,41 @@ export class AnthropicAdapter extends AIProviderAdapter {
     };
   }
 
+  /**
+   * Anthropic exposes GET /v1/models. It reports no context window, so the
+   * documented per-family limit is applied instead of leaving the field blank.
+   */
+  async listRemoteModels(ctx = {}) {
+    if (!ctx.apiKey) throw new AIError('auth', 'برای دریافت فهرست مدل‌ها ابتدا یک کلید API ثبت کنید', { retryable: false });
+    const url = `${this.#base()}/v1/models?limit=200`;
+    const json = await this.requestJsonGet({ url, headers: this.#headers(ctx.apiKey), signal: ctx.signal });
+    const models = (json.data ?? []).map((m) => {
+      const id = String(m.id ?? '');
+      return {
+        identifier: id,
+        display_name: m.display_name ?? id,
+        description: '',
+        // Documented Anthropic context windows (the API omits them).
+        context_window: /claude-(sonnet-4|opus-4|3-7)/.test(id) ? 200_000
+          : /claude-3-5/.test(id) ? 200_000
+          : /claude-3/.test(id) ? 200_000 : null,
+        max_output: /claude-(sonnet-4|3-7)/.test(id) ? 64_000 : 8_192,
+        input_price: null, output_price: null,
+        capabilities: ['chat', 'streaming', 'vision', 'tools'],
+        owned_by: 'anthropic',
+        created: m.created_at ?? null,
+      };
+    }).filter((m) => m.identifier);
+    return { supported: true, models };
+  }
+
+  #base() {
+    return (this.baseUrl ?? 'https://api.anthropic.com').replace(/\/+$/, '');
+  }
+
   async chat(req, ctx) {
     if (!ctx.apiKey) throw new AIError('auth', 'No API key configured for this provider', { retryable: false });
-    const url = `${(this.baseUrl ?? 'https://api.anthropic.com').replace(/\/$/, '')}/v1/messages`;
+    const url = `${this.#base()}/v1/messages`;
 
     // Anthropic requires the system prompt separately and roles user/assistant only.
     const system = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
