@@ -74,7 +74,8 @@ export async function buildServer(overrides = {}) {
   try {
     const { existsSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
-    const distDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../admin/dist');
+    // server.js lives at <root>/apps/api/src → panel build output at <root>/apps/admin/dist
+    const distDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../admin/dist');
     if (existsSync(distDir)) {
       const fastifyStatic = (await import('@fastify/static')).default;
       await fastify.register(fastifyStatic, { root: distDir, wildcard: false });
